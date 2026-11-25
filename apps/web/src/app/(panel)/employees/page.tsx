@@ -33,7 +33,7 @@ export default async function EmployeesPage({ searchParams }: Props) {
 
       {/* Bez prawa do zaproszeń (`core.employees.manage`) Core nie pokaże listy zaproszeń, więc nie ma też formularza */}
       {invitations.ok && (
-        <Card className="p-4">
+        <Card id="zapros" className="scroll-mt-4 p-4">
           <CardHeader>
             <CardTitle>Zaproś osobę</CardTitle>
           </CardHeader>

@@ -26,7 +26,7 @@ export default async function RolesPage({ searchParams }: Props) {
       <Notice ok={ok} error={error} />
 
       {roles.ok && sorted.length > 0 && (
-        <Card className="p-4">
+        <Card id="nowa-rola" className="scroll-mt-4 p-4">
           <CardHeader>
             <CardTitle>Nowa rola</CardTitle>
           </CardHeader>
