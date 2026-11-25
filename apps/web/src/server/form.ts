@@ -16,10 +16,21 @@ export interface FormResult {
   to?: string;
 }
 
-const back = (path: string, params: Record<string, string>) => {
+/** Ciasteczko z powodem odmowy podanym przez Core; strona pokazuje go razem z `?error=` (30 s). */
+export const ERROR_DETAIL_COOKIE = "portal-error-detail";
+
+const back = (path: string, params: Record<string, string>, detail?: string) => {
   const url = new URL(path, config.appUrl);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-  return Response.redirect(url, 303);
+  const headers = new Headers({ Location: url.toString(), "Cache-Control": "no-store" });
+  // Zawsze nadpisujemy powód: nowy z Core albo pusty, żeby nie został stary z poprzedniej akcji
+  const secure = url.protocol === "https:" ? "; Secure" : "";
+  const value = detail ? encodeURIComponent(detail.slice(0, 300)) : "";
+  headers.append(
+    "Set-Cookie",
+    `${ERROR_DETAIL_COOKIE}=${value}; Path=/; Max-Age=${detail ? 30 : 0}; HttpOnly; SameSite=Lax${secure}`,
+  );
+  return new Response(null, { status: 303, headers });
 };
 
 /** Brak albo błędne pole formularza (bez pytania Core): powrót z `?error=VALIDATION_FAILED`. */
@@ -61,7 +72,8 @@ export function formAction(path: string, action: (context: FormContext) => Promi
           if (error instanceof InvalidForm) return back(path, { error: "VALIDATION_FAILED" });
           if (error instanceof CoreApiError) {
             if (error.code === "UNAUTHENTICATED") return back("/api/auth/sign-in", { returnTo: path });
-            return back(path, { error: error.code });
+            // Powód z Core jest już zwykłym zdaniem po polsku (np. „…wyłącznie aktywnemu kontu”)
+            return back(path, { error: error.code }, error.message);
           }
           if (error instanceof CoreApiUnavailableError) return back(path, { error: "UNAVAILABLE" });
           throw error;
