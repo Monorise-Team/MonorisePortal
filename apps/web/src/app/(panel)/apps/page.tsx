@@ -1,5 +1,6 @@
 import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, Select } from "@monorise-team/ui";
 import { LoadFailed, Notice } from "@/components/Notice";
+import { hasActiveAccount, namesByAccount } from "@/lib/employees";
 import { productLabel } from "@/lib/products";
 import { load, requirePageSession } from "@/server/page";
 
@@ -24,10 +25,10 @@ export default async function AppsPage({ searchParams }: Props) {
     load(() => core.listAppAccess({ query: { limit: 100 } })),
     load(() => core.listEmployees({ query: { limit: 100 } })),
   ]);
-  const people = (employees.ok ? employees.data.items : []).filter(
-    (employee) => employee.accountId && employee.status === "ACTIVE",
-  );
-  const nameOf = new Map(people.map((employee) => [employee.accountId!, `${employee.firstName} ${employee.lastName}`]));
+  const allEmployees = employees.ok ? employees.data.items : [];
+  // Do wyboru tylko aktywne konta; imiona przy nadanych dostępach także dla pozostałych
+  const people = allEmployees.filter(hasActiveAccount);
+  const nameOf = namesByAccount(allEmployees);
   const active = access.ok ? access.data.items.filter((item) => item.status === "ACTIVE") : [];
 
   return (
@@ -72,7 +73,7 @@ export default async function AppsPage({ searchParams }: Props) {
           .map((entitlement) => {
             const granted = active.filter((item) => item.product === entitlement.product);
             const withAccess = new Set(granted.map((item) => item.accountId));
-            const candidates = people.filter((employee) => !withAccess.has(employee.accountId!));
+            const candidates = people.filter((employee) => !withAccess.has(employee.accountId));
             return (
               <Card key={entitlement.id} className="p-4">
                 <CardHeader>
@@ -113,7 +114,7 @@ export default async function AppsPage({ searchParams }: Props) {
                             Wybierz osobę
                           </option>
                           {candidates.map((employee) => (
-                            <option key={employee.id} value={employee.accountId!}>
+                            <option key={employee.id} value={employee.accountId}>
                               {employee.firstName} {employee.lastName}
                             </option>
                           ))}

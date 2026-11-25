@@ -1,6 +1,7 @@
 import { Badge, Button, Card, CardHeader, CardTitle, Select, TextArea, TextField } from "@monorise-team/ui";
 import Link from "next/link";
 import { LoadFailed, Notice } from "@/components/Notice";
+import { hasActiveAccount, namesByAccount } from "@/lib/employees";
 import { productLabel } from "@/lib/products";
 import { roleArea } from "@/lib/roles";
 import { load, requirePageSession } from "@/server/page";
@@ -43,11 +44,10 @@ export default async function RolePage({ params, searchParams }: Props) {
   const available = permissions.ok
     ? permissions.data.items.filter((permission) => (permission.product ?? null) === (role.data.product ?? null))
     : [];
-  const people = new Map(
-    (employees.ok ? employees.data.items : [])
-      .filter((employee) => employee.accountId)
-      .map((employee) => [employee.accountId!, `${employee.firstName} ${employee.lastName}`]),
-  );
+  const allEmployees = employees.ok ? employees.data.items : [];
+  // Imiona przy przypisaniach dla wszystkich kont, a do wyboru tylko aktywne konta
+  const people = namesByAccount(allEmployees);
+  const assignable = allEmployees.filter(hasActiveAccount);
   const unitNames = new Map((units.ok ? units.data.items : []).map((unit) => [unit.id, unit.name]));
 
   return (
@@ -153,16 +153,16 @@ export default async function RolePage({ params, searchParams }: Props) {
                 ))}
               </ul>
             )}
-            {!role.data.archivedAt && people.size > 0 && (
+            {!role.data.archivedAt && assignable.length > 0 && (
               <form method="post" action="/api/role-assignments" className="grid gap-3 sm:grid-cols-2">
                 <input type="hidden" name="roleId" value={role.data.id} />
                 <Select name="accountId" label="Osoba" required defaultValue="">
                   <option value="" disabled>
                     Wybierz osobę
                   </option>
-                  {[...people].map(([accountId, name]) => (
-                    <option key={accountId} value={accountId}>
-                      {name}
+                  {assignable.map((employee) => (
+                    <option key={employee.id} value={employee.accountId}>
+                      {employee.firstName} {employee.lastName}
                     </option>
                   ))}
                 </Select>

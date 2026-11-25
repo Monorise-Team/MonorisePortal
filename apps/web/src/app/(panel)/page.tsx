@@ -1,5 +1,6 @@
 import { Badge, Button, Card, CardHeader, CardTitle, Select } from "@monorise-team/ui";
 import { LoadFailed, Notice } from "@/components/Notice";
+import { hasActiveAccount } from "@/lib/employees";
 import { load, requirePageSession } from "@/server/page";
 
 interface Props {
@@ -17,9 +18,7 @@ export default async function CompanyPage({ searchParams }: Props) {
   const employees = isOwner ? await load(() => core.listEmployees({ query: { limit: 100 } })) : null;
   const candidates =
     employees?.ok && me.ok
-      ? employees.data.items.filter(
-          (employee) => employee.accountId && employee.accountId !== me.data.account.id && employee.status === "ACTIVE",
-        )
+      ? employees.data.items.filter(hasActiveAccount).filter((employee) => employee.accountId !== me.data.account.id)
       : [];
 
   return (
@@ -72,7 +71,7 @@ export default async function CompanyPage({ searchParams }: Props) {
                   Wybierz osobę
                 </option>
                 {candidates.map((employee) => (
-                  <option key={employee.id} value={employee.accountId!}>
+                  <option key={employee.id} value={employee.accountId}>
                     {employee.firstName} {employee.lastName}
                     {employee.workEmail ? ` (${employee.workEmail})` : ""}
                   </option>
