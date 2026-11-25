@@ -13,16 +13,17 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@monorise-team/auth": "0.0.1-dev.9",
-    "@monorise-team/sdk": "0.0.1-dev.9",
-    "@monorise-team/ui": "0.0.1-dev.9",
+    "@monorise-team/auth": "0.0.1-dev.10",
+    "@monorise-team/sdk": "0.0.1-dev.10",
+    "@monorise-team/ui": "0.0.1-dev.10",
     "next": "^16.4.5",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "server-only": "^0.0.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@monorise-team/config": "0.0.1-dev.9",
+    "@monorise-team/config": "0.0.1-dev.10",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^24.10.0",
     "@types/react": "^19.3.0",
