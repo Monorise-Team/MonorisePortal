@@ -20,7 +20,7 @@ export default async function StructurePage({ searchParams }: Props) {
       <h1 className="text-xl font-semibold text-text-primary">Struktura</h1>
       <Notice ok={ok} error={error} />
 
-      <Card className="p-4">
+      <Card id="nowa-jednostka" className="scroll-mt-4 p-4">
         <CardHeader>
           <CardTitle>Nowa jednostka</CardTitle>
         </CardHeader>

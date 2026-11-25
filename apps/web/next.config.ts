@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   // Kontener albo serwer Node: jeden katalog z serwerem i zależnościami (ADR-0096)
   output: "standalone",
   poweredByHeader: false,
+  // Znaczek trybu deweloperskiego w prawym dolnym rogu, żeby nie zasłaniał przycisku zwijania paska bocznego
+  devIndicators: { position: "bottom-right" },
   async headers() {
     return [
       {
