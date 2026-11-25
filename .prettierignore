@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+pnpm-lock.yaml
+CHANGELOG.md
+LICENSE
+.github/ISSUE_TEMPLATE/
+.github/pull_request_template.md
