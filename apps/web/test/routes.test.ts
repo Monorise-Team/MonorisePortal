@@ -35,6 +35,11 @@ const fakeCore = {
   updateEmployee: vi.fn(),
   deactivateEmployee: vi.fn(),
   reactivateEmployee: vi.fn(),
+  updateOrganization: vi.fn(),
+  addOrganizationDomain: vi.fn(),
+  verifyOrganizationDomain: vi.fn(),
+  setPrimaryOrganizationDomain: vi.fn(),
+  deleteOrganizationDomain: vi.fn(),
   transferOrganizationOwner: vi.fn(),
   createUnit: vi.fn(),
   updateUnit: vi.fn(),
@@ -82,7 +87,12 @@ import { POST as updateEmployeePost } from "@/app/api/employees/[employeeId]/rou
 import { POST as resendInvitationPost } from "@/app/api/invitations/[invitationId]/resend/route";
 import { POST as revokeInvitationPost } from "@/app/api/invitations/[invitationId]/revoke/route";
 import { POST as createInvitationPost } from "@/app/api/invitations/route";
+import { POST as deleteDomainPost } from "@/app/api/organization/domains/[domainId]/delete/route";
+import { POST as setPrimaryDomainPost } from "@/app/api/organization/domains/[domainId]/primary/route";
+import { POST as verifyDomainPost } from "@/app/api/organization/domains/[domainId]/verify/route";
+import { POST as addDomainPost } from "@/app/api/organization/domains/route";
 import { POST as transferOwnerPost } from "@/app/api/organization/owner/route";
+import { POST as updateOrganizationPost } from "@/app/api/organization/route";
 import { POST as removeRoleAssignmentPost } from "@/app/api/role-assignments/[assignmentId]/remove/route";
 import { POST as createRoleAssignmentPost } from "@/app/api/role-assignments/route";
 import { POST as archiveRolePost } from "@/app/api/roles/[roleId]/archive/route";
@@ -181,6 +191,253 @@ describe("trasy formularzy Portalu", () => {
       });
       expectRedirect(roleRes, "/roles", { error: "NOT_FOUND" }, "Brak roli");
       expect(roleRes.headers.get("Location")).not.toContain("../x");
+    });
+  });
+
+  describe("POST /api/organization", () => {
+    it("zapisuje nową nazwę firmy i wraca z komunikatem sukcesu", async () => {
+      const res = await updateOrganizationPost(post("/api/organization", formOf({ name: "Acme Europe" })));
+      expect(fakeCore.updateOrganization).toHaveBeenCalledWith({ body: { name: "Acme Europe" } });
+      expectRedirect(res, "/", { ok: "organization-updated" });
+    });
+
+    it("bez sesji przekierowuje na logowanie i odrzuca pustą nazwę bez pytania Core", async () => {
+      authState.unauthenticated = true;
+      const unauth = await updateOrganizationPost(post("/api/organization", formOf({ name: "Acme Europe" })));
+      expectRedirect(unauth, "/api/auth/sign-in", { returnTo: "/" });
+
+      authState.unauthenticated = false;
+      const blank = await updateOrganizationPost(post("/api/organization", formOf({ name: "   " })));
+      expectRedirect(blank, "/", { error: "VALIDATION_FAILED" });
+      expect(fakeCore.updateOrganization).not.toHaveBeenCalled();
+    });
+
+    it("mapuje błędy Core 422 i 403 na przekierowanie z komunikatem z Core", async () => {
+      const validationMsg = "Nazwa firmy musi mieć co najmniej 2 znaki";
+      fakeCore.updateOrganization.mockRejectedValueOnce(coreError("VALIDATION_FAILED", validationMsg, 422));
+      const invalid = await updateOrganizationPost(post("/api/organization", formOf({ name: "A" })));
+      expectRedirect(invalid, "/", { error: "VALIDATION_FAILED" }, validationMsg);
+
+      const deniedMsg = "Brak uprawnień do zarządzania firmą";
+      fakeCore.updateOrganization.mockRejectedValueOnce(coreError("PERMISSION_DENIED", deniedMsg, 403));
+      const denied = await updateOrganizationPost(post("/api/organization", formOf({ name: "Acme Europe" })));
+      expectRedirect(denied, "/", { error: "PERMISSION_DENIED" }, deniedMsg);
+    });
+  });
+
+  describe("POST /api/organization/domains", () => {
+    it("dodaje domenę z przekazaniem Idempotency-Key i wraca z komunikatem sukcesu", async () => {
+      const res = await addDomainPost(
+        post("/api/organization/domains", formOf({ domain: "acme.eu", idempotencyKey: UUID_1 })),
+      );
+      expect(fakeCore.addOrganizationDomain).toHaveBeenCalledWith({
+        body: { domain: "acme.eu" },
+        headers: { "Idempotency-Key": UUID_1 },
+      });
+      expectRedirect(res, "/", { ok: "domain-added" });
+    });
+
+    it("bez sesji przekierowuje na logowanie i odrzuca pustą domenę bez pytania Core", async () => {
+      authState.unauthenticated = true;
+      const unauth = await addDomainPost(post("/api/organization/domains", formOf({ domain: "acme.eu" })));
+      expectRedirect(unauth, "/api/auth/sign-in", { returnTo: "/" });
+
+      authState.unauthenticated = false;
+      const empty = await addDomainPost(post("/api/organization/domains", formOf({ domain: "  " })));
+      expectRedirect(empty, "/", { error: "VALIDATION_FAILED" });
+      expect(fakeCore.addOrganizationDomain).not.toHaveBeenCalled();
+    });
+
+    it("mapuje błędy Core 409, 422 i 403 na przekierowanie z komunikatem z Core", async () => {
+      const conflictMsg = "Ta domena jest już przypisana do firmy";
+      fakeCore.addOrganizationDomain.mockRejectedValueOnce(coreError("CONFLICT", conflictMsg, 409));
+      const conflict = await addDomainPost(post("/api/organization/domains", formOf({ domain: "acme.eu" })));
+      expectRedirect(conflict, "/", { error: "CONFLICT" }, conflictMsg);
+
+      const freeDomainMsg = "Darmowe domeny pocztowe nie mogą należeć do firmy";
+      fakeCore.addOrganizationDomain.mockRejectedValueOnce(coreError("EMAIL_DOMAIN_NOT_ALLOWED", freeDomainMsg, 422));
+      const freeDomain = await addDomainPost(post("/api/organization/domains", formOf({ domain: "gmail.com" })));
+      expectRedirect(freeDomain, "/", { error: "EMAIL_DOMAIN_NOT_ALLOWED" }, freeDomainMsg);
+
+      const deniedMsg = "Brak uprawnień do zarządzania domenami firmy";
+      fakeCore.addOrganizationDomain.mockRejectedValueOnce(coreError("PERMISSION_DENIED", deniedMsg, 403));
+      const denied = await addDomainPost(post("/api/organization/domains", formOf({ domain: "acme.eu" })));
+      expectRedirect(denied, "/", { error: "PERMISSION_DENIED" }, deniedMsg);
+    });
+  });
+
+  describe("POST /api/organization/domains/[domainId]/verify", () => {
+    it("weryfikuje domenę przez DNS bez pola trustLocally i przekazuje Idempotency-Key", async () => {
+      const res = await verifyDomainPost(
+        post(`/api/organization/domains/${UUID_1}/verify`, formOf({ idempotencyKey: UUID_2 })),
+        { params: Promise.resolve({ domainId: UUID_1 }) },
+      );
+      expect(fakeCore.verifyOrganizationDomain).toHaveBeenCalledWith({
+        path: { domainId: UUID_1 },
+        body: {},
+        headers: { "Idempotency-Key": UUID_2 },
+      });
+      expectRedirect(res, "/", { ok: "domain-verified" });
+    });
+
+    it("przekazuje trustLocally tylko wtedy, gdy pole trustLocally=1 jest obecne", async () => {
+      const trusted = await verifyDomainPost(
+        post(`/api/organization/domains/${UUID_1}/verify`, formOf({ trustLocally: "1", idempotencyKey: UUID_3 })),
+        { params: Promise.resolve({ domainId: UUID_1 }) },
+      );
+      expect(fakeCore.verifyOrganizationDomain).toHaveBeenCalledWith({
+        path: { domainId: UUID_1 },
+        body: { trustLocally: true },
+        headers: { "Idempotency-Key": UUID_3 },
+      });
+      expectRedirect(trusted, "/", { ok: "domain-verified" });
+
+      const otherValue = await verifyDomainPost(
+        post(`/api/organization/domains/${UUID_1}/verify`, formOf({ trustLocally: "0", idempotencyKey: UUID_2 })),
+        { params: Promise.resolve({ domainId: UUID_1 }) },
+      );
+      expect(fakeCore.verifyOrganizationDomain).toHaveBeenLastCalledWith({
+        path: { domainId: UUID_1 },
+        body: {},
+        headers: { "Idempotency-Key": UUID_2 },
+      });
+      expectRedirect(otherValue, "/", { ok: "domain-verified" });
+    });
+
+    it("bez sesji przekierowuje na logowanie i odrzuca złe domainId bez pytania Core", async () => {
+      authState.unauthenticated = true;
+      const unauth = await verifyDomainPost(post(`/api/organization/domains/${UUID_1}/verify`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(unauth, "/api/auth/sign-in", { returnTo: "/" });
+
+      authState.unauthenticated = false;
+      const badId = await verifyDomainPost(post("/api/organization/domains/not-a-uuid/verify"), {
+        params: Promise.resolve({ domainId: "not-a-uuid" }),
+      });
+      expectRedirect(badId, "/", { error: "VALIDATION_FAILED" });
+      expect(fakeCore.verifyOrganizationDomain).not.toHaveBeenCalled();
+    });
+
+    it("mapuje błędy Core 422, 409 i 403 na przekierowanie z komunikatem z Core", async () => {
+      const dnsMsg = "Nie znaleziono oczekiwanego rekordu TXT w DNS";
+      fakeCore.verifyOrganizationDomain.mockRejectedValueOnce(coreError("VALIDATION_FAILED", dnsMsg, 422));
+      const noTxt = await verifyDomainPost(post(`/api/organization/domains/${UUID_1}/verify`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(noTxt, "/", { error: "VALIDATION_FAILED" }, dnsMsg);
+
+      const conflictMsg = "Ta domena została już zweryfikowana przez inną firmę";
+      fakeCore.verifyOrganizationDomain.mockRejectedValueOnce(coreError("CONFLICT", conflictMsg, 409));
+      const conflict = await verifyDomainPost(post(`/api/organization/domains/${UUID_1}/verify`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(conflict, "/", { error: "CONFLICT" }, conflictMsg);
+
+      const deniedMsg = "Potwierdzenie bez DNS działa tylko lokalnie";
+      fakeCore.verifyOrganizationDomain.mockRejectedValueOnce(coreError("PERMISSION_DENIED", deniedMsg, 403));
+      const denied = await verifyDomainPost(
+        post(`/api/organization/domains/${UUID_1}/verify`, formOf({ trustLocally: "1" })),
+        { params: Promise.resolve({ domainId: UUID_1 }) },
+      );
+      expectRedirect(denied, "/", { error: "PERMISSION_DENIED" }, deniedMsg);
+    });
+  });
+
+  describe("POST /api/organization/domains/[domainId]/primary", () => {
+    it("ustawia domenę jako główną i wraca z komunikatem sukcesu", async () => {
+      const res = await setPrimaryDomainPost(post(`/api/organization/domains/${UUID_1}/primary`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expect(fakeCore.setPrimaryOrganizationDomain).toHaveBeenCalledWith({ path: { domainId: UUID_1 } });
+      expectRedirect(res, "/", { ok: "domain-primary-changed" });
+    });
+
+    it("bez sesji przekierowuje na logowanie i odrzuca złe domainId bez pytania Core", async () => {
+      authState.unauthenticated = true;
+      const unauth = await setPrimaryDomainPost(post(`/api/organization/domains/${UUID_1}/primary`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(unauth, "/api/auth/sign-in", { returnTo: "/" });
+
+      authState.unauthenticated = false;
+      const badId = await setPrimaryDomainPost(post("/api/organization/domains/not-a-uuid/primary"), {
+        params: Promise.resolve({ domainId: "not-a-uuid" }),
+      });
+      expectRedirect(badId, "/", { error: "VALIDATION_FAILED" });
+      expect(fakeCore.setPrimaryOrganizationDomain).not.toHaveBeenCalled();
+    });
+
+    it("mapuje błędy Core 409, 422 i 403 na przekierowanie z komunikatem z Core", async () => {
+      const conflictMsg = "Główną domeną firmy może być wyłącznie zweryfikowana domena";
+      fakeCore.setPrimaryOrganizationDomain.mockRejectedValueOnce(coreError("CONFLICT", conflictMsg, 409));
+      const conflict = await setPrimaryDomainPost(post(`/api/organization/domains/${UUID_1}/primary`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(conflict, "/", { error: "CONFLICT" }, conflictMsg);
+
+      const validationMsg = "Nieprawidłowy identyfikator domeny";
+      fakeCore.setPrimaryOrganizationDomain.mockRejectedValueOnce(coreError("VALIDATION_FAILED", validationMsg, 422));
+      const invalid = await setPrimaryDomainPost(post(`/api/organization/domains/${UUID_1}/primary`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(invalid, "/", { error: "VALIDATION_FAILED" }, validationMsg);
+
+      const deniedMsg = "Brak uprawnień do zarządzania firmą";
+      fakeCore.setPrimaryOrganizationDomain.mockRejectedValueOnce(coreError("PERMISSION_DENIED", deniedMsg, 403));
+      const denied = await setPrimaryDomainPost(post(`/api/organization/domains/${UUID_1}/primary`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(denied, "/", { error: "PERMISSION_DENIED" }, deniedMsg);
+    });
+  });
+
+  describe("POST /api/organization/domains/[domainId]/delete", () => {
+    it("usuwa domenę przez deleteOrganizationDomain i wraca z komunikatem sukcesu", async () => {
+      const res = await deleteDomainPost(post(`/api/organization/domains/${UUID_1}/delete`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expect(fakeCore.deleteOrganizationDomain).toHaveBeenCalledWith({ path: { domainId: UUID_1 } });
+      expectRedirect(res, "/", { ok: "domain-deleted" });
+    });
+
+    it("bez sesji przekierowuje na logowanie i odrzuca złe domainId bez pytania Core", async () => {
+      authState.unauthenticated = true;
+      const unauth = await deleteDomainPost(post(`/api/organization/domains/${UUID_1}/delete`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(unauth, "/api/auth/sign-in", { returnTo: "/" });
+
+      authState.unauthenticated = false;
+      const badId = await deleteDomainPost(post("/api/organization/domains/not-a-uuid/delete"), {
+        params: Promise.resolve({ domainId: "not-a-uuid" }),
+      });
+      expectRedirect(badId, "/", { error: "VALIDATION_FAILED" });
+      expect(fakeCore.deleteOrganizationDomain).not.toHaveBeenCalled();
+    });
+
+    it("mapuje błędy Core 409, 422 i 403 na przekierowanie z komunikatem z Core", async () => {
+      const conflictMsg =
+        "Nie można usunąć domeny, ponieważ jest używana przez konta, pracowników lub oczekujące zaproszenia w firmie";
+      fakeCore.deleteOrganizationDomain.mockRejectedValueOnce(coreError("CONFLICT", conflictMsg, 409));
+      const conflict = await deleteDomainPost(post(`/api/organization/domains/${UUID_1}/delete`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(conflict, "/", { error: "CONFLICT" }, conflictMsg);
+
+      const validationMsg = "Nieprawidłowy identyfikator domeny";
+      fakeCore.deleteOrganizationDomain.mockRejectedValueOnce(coreError("VALIDATION_FAILED", validationMsg, 422));
+      const invalid = await deleteDomainPost(post(`/api/organization/domains/${UUID_1}/delete`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(invalid, "/", { error: "VALIDATION_FAILED" }, validationMsg);
+
+      const deniedMsg = "Brak uprawnień do zarządzania firmą";
+      fakeCore.deleteOrganizationDomain.mockRejectedValueOnce(coreError("PERMISSION_DENIED", deniedMsg, 403));
+      const denied = await deleteDomainPost(post(`/api/organization/domains/${UUID_1}/delete`), {
+        params: Promise.resolve({ domainId: UUID_1 }),
+      });
+      expectRedirect(denied, "/", { error: "PERMISSION_DENIED" }, deniedMsg);
     });
   });
 
