@@ -2,6 +2,7 @@ import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, TextField } fro
 import { IdempotencyField } from "@/components/IdempotencyField";
 import { LoadFailed, Notice } from "@/components/Notice";
 import { employeeAccountAction } from "@/lib/employees";
+import { invitationDeliveryView } from "@/lib/invitations";
 import { load, requirePageSession } from "@/server/page";
 
 interface Props {
@@ -75,26 +76,37 @@ export default async function EmployeesPage({ searchParams }: Props) {
           <p className="text-sm text-text-tertiary">Brak oczekujących zaproszeń.</p>
         ) : (
           <ul className="divide-y divide-border-primary">
-            {invitations.data.items.map((invitation) => (
-              <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
-                <div className="text-sm">
-                  <p className="text-text-primary">{invitation.email}</p>
-                  <p className="text-text-tertiary">ważne do {dateFormat.format(new Date(invitation.expiresAt))}</p>
-                </div>
-                <div className="flex gap-2">
-                  <form method="post" action={`/api/invitations/${invitation.id}/resend`}>
-                    <Button type="submit" variant="outline">
-                      Wyślij ponownie
-                    </Button>
-                  </form>
-                  <form method="post" action={`/api/invitations/${invitation.id}/revoke`}>
-                    <Button type="submit" variant="ghost">
-                      Cofnij
-                    </Button>
-                  </form>
-                </div>
-              </li>
-            ))}
+            {invitations.data.items.map((invitation) => {
+              const delivery = invitationDeliveryView(invitation.delivery);
+              return (
+                <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                  <div className="text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-text-primary">{invitation.email}</p>
+                      {delivery && <Badge tone={delivery.tone}>{delivery.label}</Badge>}
+                    </div>
+                    <p className="text-text-tertiary">
+                      {[`ważne do ${dateFormat.format(new Date(invitation.expiresAt))}`, delivery?.detail]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    {delivery?.hint && <p className="mt-1 text-xs text-text-secondary">{delivery.hint}</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <form method="post" action={`/api/invitations/${invitation.id}/resend`}>
+                      <Button type="submit" variant="outline">
+                        Wyślij ponownie
+                      </Button>
+                    </form>
+                    <form method="post" action={`/api/invitations/${invitation.id}/revoke`}>
+                      <Button type="submit" variant="ghost">
+                        Cofnij
+                      </Button>
+                    </form>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Card>
