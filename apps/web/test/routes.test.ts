@@ -32,6 +32,7 @@ const fakeCore = {
   createInvitation: vi.fn(),
   resendInvitation: vi.fn(),
   revokeInvitation: vi.fn(),
+  updateEmployee: vi.fn(),
   transferOrganizationOwner: vi.fn(),
   createUnit: vi.fn(),
   updateUnit: vi.fn(),
@@ -73,6 +74,7 @@ vi.mock("@/server/core", () => ({
 
 import { POST as revokeAppAccessPost } from "@/app/api/app-access/[appAccessId]/revoke/route";
 import { POST as grantAppAccessPost } from "@/app/api/app-access/route";
+import { POST as updateEmployeePost } from "@/app/api/employees/[employeeId]/route";
 import { POST as resendInvitationPost } from "@/app/api/invitations/[invitationId]/resend/route";
 import { POST as revokeInvitationPost } from "@/app/api/invitations/[invitationId]/revoke/route";
 import { POST as createInvitationPost } from "@/app/api/invitations/route";
@@ -208,12 +210,16 @@ describe("trasy formularzy Portalu", () => {
   });
 
   describe("POST /api/invitations", () => {
-    it("wysyła zaproszenie dla nowej osoby (email, imię, nazwisko)", async () => {
+    it("wysyła zaproszenie dla nowej osoby (email, imię, nazwisko) z kluczem idempotentności", async () => {
       const res = await createInvitationPost(
-        post("/api/invitations", formOf({ email: "anna@acme.test", firstName: "Anna", lastName: "Nowak" })),
+        post(
+          "/api/invitations",
+          formOf({ email: "anna@acme.test", firstName: "Anna", lastName: "Nowak", idempotencyKey: UUID_3 }),
+        ),
       );
       expect(fakeCore.createInvitation).toHaveBeenCalledWith({
         body: { email: "anna@acme.test", firstName: "Anna", lastName: "Nowak" },
+        headers: { "Idempotency-Key": UUID_3 },
       });
       expectRedirect(res, "/employees", { ok: "invited" });
     });
@@ -224,6 +230,7 @@ describe("trasy formularzy Portalu", () => {
       );
       expect(fakeCore.createInvitation).toHaveBeenCalledWith({
         body: { email: "anna@acme.test", employeeId: UUID_1 },
+        headers: { "Idempotency-Key": expect.any(String) },
       });
       expectRedirect(res, "/employees", { ok: "invited" });
     });
@@ -282,10 +289,108 @@ describe("trasy formularzy Portalu", () => {
     });
   });
 
+  describe("POST /api/employees/[employeeId]", () => {
+    it("aktualizuje imię, nazwisko i stanowisko pracownika z kontem (bez wysyłania workEmail)", async () => {
+      const res = await updateEmployeePost(
+        post(`/api/employees/${UUID_1}`, formOf({ firstName: "Jan", lastName: "Kowalski", jobTitle: "Programista" })),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expect(fakeCore.updateEmployee).toHaveBeenCalledWith({
+        path: { employeeId: UUID_1 },
+        body: { firstName: "Jan", lastName: "Kowalski", jobTitle: "Programista" },
+      });
+      expectRedirect(res, "/employees", { ok: "employee-updated" });
+    });
+
+    it("aktualizuje lub czyści stanowisko i workEmail pracownika bez konta", async () => {
+      const withEmail = await updateEmployeePost(
+        post(
+          `/api/employees/${UUID_1}`,
+          formOf({ firstName: "Ewa", lastName: "Zielińska", jobTitle: "  ", workEmail: "ewa@acme.test" }),
+        ),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expect(fakeCore.updateEmployee).toHaveBeenCalledWith({
+        path: { employeeId: UUID_1 },
+        body: { firstName: "Ewa", lastName: "Zielińska", jobTitle: null, workEmail: "ewa@acme.test" },
+      });
+      expectRedirect(withEmail, "/employees", { ok: "employee-updated" });
+
+      const clearedEmail = await updateEmployeePost(
+        post(
+          `/api/employees/${UUID_1}`,
+          formOf({ firstName: "Ewa", lastName: "Zielińska", jobTitle: "", workEmail: "" }),
+        ),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expect(fakeCore.updateEmployee).toHaveBeenCalledWith({
+        path: { employeeId: UUID_1 },
+        body: { firstName: "Ewa", lastName: "Zielińska", jobTitle: null, workEmail: null },
+      });
+      expectRedirect(clearedEmail, "/employees", { ok: "employee-updated" });
+    });
+
+    it("mapuje błędy Core 409 i 422 na przekierowanie z komunikatem z Core", async () => {
+      const conflictMsg = "Nie można zmienić służbowego adresu e-mail pracownika powiązanego z kontem logowania";
+      fakeCore.updateEmployee.mockRejectedValueOnce(coreError("CONFLICT", conflictMsg, 409));
+      const conflict = await updateEmployeePost(
+        post(`/api/employees/${UUID_1}`, formOf({ firstName: "Jan", lastName: "Kowalski", workEmail: "a@acme.test" })),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expectRedirect(conflict, "/employees", { error: "CONFLICT" }, conflictMsg);
+
+      const domainMsg = "Domena adresu e-mail nie należy do zweryfikowanych domen firmy";
+      fakeCore.updateEmployee.mockRejectedValueOnce(coreError("EMAIL_DOMAIN_NOT_ALLOWED", domainMsg, 422));
+      const badDomain = await updateEmployeePost(
+        post(
+          `/api/employees/${UUID_1}`,
+          formOf({ firstName: "Jan", lastName: "Kowalski", workEmail: "jan@gmail.com" }),
+        ),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expectRedirect(badDomain, "/employees", { error: "EMAIL_DOMAIN_NOT_ALLOWED" }, domainMsg);
+
+      const validationMsg = "Nieprawidłowy adres e-mail";
+      fakeCore.updateEmployee.mockRejectedValueOnce(coreError("VALIDATION_FAILED", validationMsg, 422));
+      const badBody = await updateEmployeePost(
+        post(`/api/employees/${UUID_1}`, formOf({ firstName: "Jan", lastName: "Kowalski", workEmail: "zly-email" })),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expectRedirect(badBody, "/employees", { error: "VALIDATION_FAILED" }, validationMsg);
+    });
+
+    it("bez sesji przekierowuje na logowanie, a przy brakujących polach lub złym ID zwraca VALIDATION_FAILED", async () => {
+      authState.unauthenticated = true;
+      const unauth = await updateEmployeePost(
+        post(`/api/employees/${UUID_1}`, formOf({ firstName: "Jan", lastName: "Kowalski" })),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expectRedirect(unauth, "/api/auth/sign-in", { returnTo: "/employees" });
+
+      authState.unauthenticated = false;
+      const missingName = await updateEmployeePost(post(`/api/employees/${UUID_1}`, formOf({ firstName: "Jan" })), {
+        params: Promise.resolve({ employeeId: UUID_1 }),
+      });
+      expectRedirect(missingName, "/employees", { error: "VALIDATION_FAILED" });
+
+      const badId = await updateEmployeePost(
+        post("/api/employees/not-a-uuid", formOf({ firstName: "Jan", lastName: "Kowalski" })),
+        { params: Promise.resolve({ employeeId: "not-a-uuid" }) },
+      );
+      expectRedirect(badId, "/employees", { error: "VALIDATION_FAILED" });
+      expect(fakeCore.updateEmployee).not.toHaveBeenCalled();
+    });
+  });
+
   describe("POST /api/units", () => {
     it("tworzy jednostkę nadrzędną z parentId null, gdy pole puste", async () => {
-      const res = await createUnitPost(post("/api/units", formOf({ name: "Kraków", type: "BRANCH", parentId: "  " })));
-      expect(fakeCore.createUnit).toHaveBeenCalledWith({ body: { name: "Kraków", type: "BRANCH", parentId: null } });
+      const res = await createUnitPost(
+        post("/api/units", formOf({ name: "Kraków", type: "BRANCH", parentId: "  ", idempotencyKey: UUID_2 })),
+      );
+      expect(fakeCore.createUnit).toHaveBeenCalledWith({
+        body: { name: "Kraków", type: "BRANCH", parentId: null },
+        headers: { "Idempotency-Key": UUID_2 },
+      });
       expectRedirect(res, "/structure", { ok: "unit-created" });
     });
 
@@ -293,7 +398,10 @@ describe("trasy formularzy Portalu", () => {
       const res = await createUnitPost(
         post("/api/units", formOf({ name: "Sprzedaż", type: "TEAM", parentId: UUID_1 })),
       );
-      expect(fakeCore.createUnit).toHaveBeenCalledWith({ body: { name: "Sprzedaż", type: "TEAM", parentId: UUID_1 } });
+      expect(fakeCore.createUnit).toHaveBeenCalledWith({
+        body: { name: "Sprzedaż", type: "TEAM", parentId: UUID_1 },
+        headers: { "Idempotency-Key": expect.any(String) },
+      });
       expectRedirect(res, "/structure", { ok: "unit-created" });
     });
 
@@ -407,10 +515,11 @@ describe("trasy formularzy Portalu", () => {
     it("tworzy rolę i kieruje na stronę nowej roli", async () => {
       fakeCore.createRole.mockResolvedValueOnce({ id: UUID_2 });
       const res = await createRolePost(
-        post("/api/roles", formOf({ copyFromRoleId: UUID_1, name: "Kierownik zmiany" })),
+        post("/api/roles", formOf({ copyFromRoleId: UUID_1, name: "Kierownik zmiany", idempotencyKey: UUID_3 })),
       );
       expect(fakeCore.createRole).toHaveBeenCalledWith({
         body: { copyFromRoleId: UUID_1, name: "Kierownik zmiany" },
+        headers: { "Idempotency-Key": UUID_3 },
       });
       expectRedirect(res, `/roles/${UUID_2}`, { ok: "role-created" });
     });
@@ -478,10 +587,14 @@ describe("trasy formularzy Portalu", () => {
   describe("POST /api/role-assignments i remove", () => {
     it("przypisuje rolę w zakresie całej firmy (org) albo jednostki (unit:<uuid>)", async () => {
       const orgRes = await createRoleAssignmentPost(
-        post("/api/role-assignments", formOf({ accountId: UUID_1, roleId: UUID_2, scope: "org" })),
+        post(
+          "/api/role-assignments",
+          formOf({ accountId: UUID_1, roleId: UUID_2, scope: "org", idempotencyKey: UUID_3 }),
+        ),
       );
       expect(fakeCore.createRoleAssignment).toHaveBeenCalledWith({
         body: { accountId: UUID_1, roleId: UUID_2, scopeType: "ORGANIZATION", scopeId: null },
+        headers: { "Idempotency-Key": UUID_3 },
       });
       expectRedirect(orgRes, `/roles/${UUID_2}`, { ok: "role-assigned" });
 
@@ -490,6 +603,7 @@ describe("trasy formularzy Portalu", () => {
       );
       expect(fakeCore.createRoleAssignment).toHaveBeenCalledWith({
         body: { accountId: UUID_1, roleId: UUID_2, scopeType: "UNIT", scopeId: UUID_3 },
+        headers: { "Idempotency-Key": expect.any(String) },
       });
       expectRedirect(unitRes, `/roles/${UUID_2}`, { ok: "role-assigned" });
     });
@@ -510,6 +624,7 @@ describe("trasy formularzy Portalu", () => {
       );
       expect(fakeCore.createRoleAssignment).toHaveBeenCalledWith({
         body: { accountId: UUID_1, roleId: "../x", scopeType: "ORGANIZATION", scopeId: null },
+        headers: { "Idempotency-Key": expect.any(String) },
       });
       expectRedirect(badRoleRedirect, "/roles", { ok: "role-assigned" });
     });
@@ -540,9 +655,12 @@ describe("trasy formularzy Portalu", () => {
 
   describe("POST /api/app-access i revoke", () => {
     it("nadaje dostęp do aplikacji, waliduje pola i obsługuje odmowę Core", async () => {
-      const ok = await grantAppAccessPost(post("/api/app-access", formOf({ accountId: UUID_1, product: "timotime" })));
+      const ok = await grantAppAccessPost(
+        post("/api/app-access", formOf({ accountId: UUID_1, product: "timotime", idempotencyKey: UUID_2 })),
+      );
       expect(fakeCore.grantAppAccess).toHaveBeenCalledWith({
         body: { accountId: UUID_1, product: "timotime" },
+        headers: { "Idempotency-Key": UUID_2 },
       });
       expectRedirect(ok, "/apps", { ok: "access-granted" });
 

@@ -18,7 +18,7 @@ import {
   useSidebar,
   type CommandPaletteGroup,
 } from "@monorise-team/ui";
-import { AppWindow, Building2, LogOut, Network, Palette, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { AppWindow, Building2, LogOut, Network, Palette, ScrollText, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
@@ -37,12 +37,20 @@ const SECTIONS: readonly Section[] = [
   { href: "/apps", label: "Aplikacje", icon: <AppWindow size={16} />, shortcut: "g a" },
 ];
 
+const AUDIT_SECTION: Section = {
+  href: "/audit",
+  label: "Dziennik",
+  icon: <ScrollText size={16} />,
+  shortcut: "g d",
+};
+
 const SETTINGS: Section = { href: "/settings", label: "Wygląd", icon: <Palette size={16} />, shortcut: "g w" };
 
 interface PanelShellProps {
   organizationName: string;
   personName: string | null;
   isOwner: boolean;
+  canReadAudit: boolean;
   children: ReactNode;
 }
 
@@ -51,11 +59,16 @@ interface PanelShellProps {
  * szklanej karcie, paleta poleceń (⌘K / Ctrl+K) i skróty `g …`. Same strony i formularze zostają po stronie
  * serwera i działają bez JavaScriptu.
  */
-export function PanelShell({ organizationName, personName, isOwner, children }: PanelShellProps) {
+export function PanelShell({ organizationName, personName, isOwner, canReadAudit, children }: PanelShellProps) {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <ShellContent organizationName={organizationName} personName={personName} isOwner={isOwner}>
+        <ShellContent
+          organizationName={organizationName}
+          personName={personName}
+          isOwner={isOwner}
+          canReadAudit={canReadAudit}
+        >
           {children}
         </ShellContent>
       </ToastProvider>
@@ -63,12 +76,14 @@ export function PanelShell({ organizationName, personName, isOwner, children }: 
   );
 }
 
-function ShellContent({ organizationName, personName, isOwner, children }: PanelShellProps) {
+function ShellContent({ organizationName, personName, isOwner, canReadAudit, children }: PanelShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const palette = useCommandPalette();
   const [helpOpen, setHelpOpen] = useState(false);
   const signOutForm = useRef<HTMLFormElement>(null);
+
+  const visibleSections = useMemo(() => (canReadAudit ? [...SECTIONS, AUDIT_SECTION] : [...SECTIONS]), [canReadAudit]);
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const go = (href: string) => router.push(href);
@@ -80,7 +95,7 @@ function ShellContent({ organizationName, personName, isOwner, children }: Panel
   };
 
   useHotkeys(
-    [...SECTIONS, SETTINGS].map((section) => ({ shortcut: section.shortcut, handler: () => go(section.href) })),
+    [...visibleSections, SETTINGS].map((section) => ({ shortcut: section.shortcut, handler: () => go(section.href) })),
   );
 
   const groups = useMemo<CommandPaletteGroup[]>(
@@ -88,7 +103,7 @@ function ShellContent({ organizationName, personName, isOwner, children }: Panel
       {
         id: "go",
         label: "Przejdź do",
-        items: [...SECTIONS, SETTINGS].map((section) => ({
+        items: [...visibleSections, SETTINGS].map((section) => ({
           id: section.href,
           label: section.label,
           icon: section.icon,
@@ -147,7 +162,7 @@ function ShellContent({ organizationName, personName, isOwner, children }: Panel
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `go` zależy tylko od routera
-    [router],
+    [router, visibleSections],
   );
 
   return (
@@ -172,7 +187,7 @@ function ShellContent({ organizationName, personName, isOwner, children }: Panel
       >
         <SidebarHeader organizationName={organizationName} personName={personName} isOwner={isOwner} />
         <SidebarNav>
-          {SECTIONS.map((section) => (
+          {visibleSections.map((section) => (
             <SidebarLink
               key={section.href}
               href={section.href}
@@ -210,7 +225,10 @@ function ShellContent({ organizationName, personName, isOwner, children }: Panel
           },
           {
             category: "Przejdź do",
-            items: [...SECTIONS, SETTINGS].map((section) => ({ label: section.label, shortcut: section.shortcut })),
+            items: [...visibleSections, SETTINGS].map((section) => ({
+              label: section.label,
+              shortcut: section.shortcut,
+            })),
           },
         ]}
       />
@@ -219,7 +237,7 @@ function ShellContent({ organizationName, personName, isOwner, children }: Panel
 }
 
 /** Firma i osoba na górze paska; po zwinięciu sam znak firmy z pełną nazwą dla czytników ekranu. */
-function SidebarHeader({ organizationName, personName, isOwner }: Omit<PanelShellProps, "children">) {
+function SidebarHeader({ organizationName, personName, isOwner }: Omit<PanelShellProps, "children" | "canReadAudit">) {
   const { collapsed } = useSidebar();
   if (collapsed) {
     return (

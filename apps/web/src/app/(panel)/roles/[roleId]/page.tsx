@@ -1,5 +1,6 @@
 import { Badge, Button, Card, CardHeader, CardTitle, Select, TextArea, TextField } from "@monorise-team/ui";
 import Link from "next/link";
+import { IdempotencyField } from "@/components/IdempotencyField";
 import { LoadFailed, Notice } from "@/components/Notice";
 import { hasActiveAccount, namesByAccount } from "@/lib/employees";
 import { productLabel } from "@/lib/products";
@@ -155,6 +156,7 @@ export default async function RolePage({ params, searchParams }: Props) {
             )}
             {!role.data.archivedAt && assignable.length > 0 && (
               <form method="post" action="/api/role-assignments" className="grid gap-3 sm:grid-cols-2">
+                <IdempotencyField />
                 <input type="hidden" name="roleId" value={role.data.id} />
                 <Select name="accountId" label="Osoba" required defaultValue="">
                   <option value="" disabled>

@@ -1,3 +1,4 @@
+import { idempotencyHeaders } from "@/lib/idempotency";
 import { isId } from "@/lib/ids";
 import { parseScope } from "@/lib/roles";
 import { InvalidForm, formAction, required } from "@/server/form";
@@ -13,6 +14,7 @@ export const POST = async (request: Request) => {
     if (!scope) throw new InvalidForm("scope");
     await core.createRoleAssignment({
       body: { accountId: required(form, "accountId"), roleId: required(form, "roleId"), ...scope },
+      headers: idempotencyHeaders(form),
     });
     return { ok: "role-assigned" };
   })(request);

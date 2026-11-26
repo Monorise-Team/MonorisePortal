@@ -1,4 +1,5 @@
 import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, TextField } from "@monorise-team/ui";
+import { IdempotencyField } from "@/components/IdempotencyField";
 import { LoadFailed, Notice } from "@/components/Notice";
 import { load, requirePageSession } from "@/server/page";
 
@@ -14,7 +15,7 @@ const EMPLOYEE_STATUS: Record<string, { label: string; tone: "success" | "neutra
 
 const dateFormat = new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium", timeZone: "Europe/Warsaw" });
 
-/** Pracownicy: lista, oczekujące zaproszenia (ponowne wysłanie, cofnięcie) i zapraszanie nowych osób. */
+/** Pracownicy: lista, edycja danych, oczekujące zaproszenia (ponowne wysłanie, cofnięcie) i zapraszanie nowych osób. */
 export default async function EmployeesPage({ searchParams }: Props) {
   const { ok, error } = await searchParams;
   const { core } = await requirePageSession();
@@ -23,7 +24,7 @@ export default async function EmployeesPage({ searchParams }: Props) {
     load(() => core.listInvitations({ query: { status: "PENDING", limit: 100 } })),
   ]);
 
-  const canInvite = invitations.ok;
+  const canManageEmployees = invitations.ok;
   const pendingEmployees = new Set(invitations.ok ? invitations.data.items.map((item) => item.employeeId) : []);
 
   return (
@@ -31,8 +32,8 @@ export default async function EmployeesPage({ searchParams }: Props) {
       <h1 className="text-xl font-semibold text-text-primary">Pracownicy</h1>
       <Notice ok={ok} error={error} />
 
-      {/* Bez prawa do zaproszeń (`core.employees.manage`) Core nie pokaże listy zaproszeń, więc nie ma też formularza */}
-      {invitations.ok && (
+      {/* Bez prawa do zarządzania pracownikami (`core.employees.manage`) Core nie pokaże listy zaproszeń */}
+      {canManageEmployees && (
         <Card id="zapros" className="scroll-mt-4 p-4">
           <CardHeader>
             <CardTitle>Zaproś osobę</CardTitle>
@@ -41,6 +42,7 @@ export default async function EmployeesPage({ searchParams }: Props) {
             Osoba dostanie e-mail z linkiem ważnym 7 dni i ustawi hasło. Adres musi być w zweryfikowanej domenie firmy.
           </p>
           <form method="post" action="/api/invitations" className="grid gap-3 sm:grid-cols-3">
+            <IdempotencyField />
             <TextField name="email" type="email" label="E-mail" required autoComplete="off" placeholder="jan@acme.pl" />
             <TextField name="firstName" label="Imię" required autoComplete="off" />
             <TextField name="lastName" label="Nazwisko" required autoComplete="off" />
@@ -97,8 +99,9 @@ export default async function EmployeesPage({ searchParams }: Props) {
           <ul className="divide-y divide-border-primary">
             {employees.data.items.map((employee) => {
               const status = EMPLOYEE_STATUS[employee.status] ?? { label: employee.status, tone: "neutral" as const };
+              const editKey = `${employee.firstName}|${employee.lastName}|${employee.jobTitle ?? ""}|${employee.workEmail ?? ""}`;
               return (
-                <li key={employee.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                <li key={employee.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="text-sm">
                     <p className="text-text-primary">
                       {employee.firstName} {employee.lastName}
@@ -113,8 +116,9 @@ export default async function EmployeesPage({ searchParams }: Props) {
                     <Badge tone={status.tone}>{status.label}</Badge>
                   </div>
                   {/* Pracownik bez konta (np. dodany przez kadry): zaproszenie na jego adres */}
-                  {canInvite && !employee.accountId && employee.status === "ACTIVE" && (
+                  {canManageEmployees && !employee.accountId && employee.status === "ACTIVE" && (
                     <form method="post" action="/api/invitations" className="flex w-full flex-wrap items-end gap-2">
+                      <IdempotencyField />
                       <input type="hidden" name="employeeId" value={employee.id} />
                       <TextField
                         name="email"
@@ -129,6 +133,73 @@ export default async function EmployeesPage({ searchParams }: Props) {
                         Zaproś
                       </Button>
                     </form>
+                  )}
+                  {canManageEmployees && employee.status !== "ANONYMIZED" && (
+                    <details className="w-full pt-1">
+                      <summary className="inline-flex cursor-pointer items-center text-xs font-medium text-text-secondary hover:text-text-primary">
+                        Edytuj
+                        <span className="sr-only">
+                          {" "}
+                          dane: {employee.firstName} {employee.lastName}
+                        </span>
+                      </summary>
+                      <form
+                        key={editKey}
+                        method="post"
+                        action={`/api/employees/${employee.id}`}
+                        className="mt-3 grid gap-3 rounded-control border border-border-primary p-3 sm:grid-cols-2"
+                      >
+                        <TextField
+                          name="firstName"
+                          label="Imię"
+                          size="sm"
+                          required
+                          maxLength={80}
+                          defaultValue={employee.firstName}
+                          autoComplete="off"
+                        />
+                        <TextField
+                          name="lastName"
+                          label="Nazwisko"
+                          size="sm"
+                          required
+                          maxLength={80}
+                          defaultValue={employee.lastName}
+                          autoComplete="off"
+                        />
+                        <TextField
+                          name="jobTitle"
+                          label="Stanowisko"
+                          size="sm"
+                          maxLength={120}
+                          defaultValue={employee.jobTitle ?? ""}
+                          autoComplete="off"
+                        />
+                        {employee.accountId ? (
+                          <div className="flex flex-col justify-center gap-0.5 text-sm">
+                            <span className="text-xs font-medium text-text-secondary">Służbowy e-mail</span>
+                            <span className="text-text-primary">{employee.workEmail ?? "brak"}</span>
+                            <span className="text-xs text-text-tertiary">
+                              Ten adres służy do logowania — nie można go zmienić w tym miejscu.
+                            </span>
+                          </div>
+                        ) : (
+                          <TextField
+                            name="workEmail"
+                            type="email"
+                            label="Służbowy e-mail"
+                            size="sm"
+                            maxLength={254}
+                            defaultValue={employee.workEmail ?? ""}
+                            autoComplete="off"
+                            hint="Adres w zweryfikowanej domenie firmy. Zostaw puste, żeby usunąć."
+                          />
+                        )}
+                        <Button type="submit" variant="primary" size="sm" className="self-start sm:col-span-2">
+                          Zapisz dane
+                        </Button>
+                      </form>
+                    </details>
                   )}
                 </li>
               );

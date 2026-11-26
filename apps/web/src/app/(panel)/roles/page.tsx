@@ -1,5 +1,6 @@
 import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, Select, TextField } from "@monorise-team/ui";
 import Link from "next/link";
+import { IdempotencyField } from "@/components/IdempotencyField";
 import { LoadFailed, Notice } from "@/components/Notice";
 import { productLabel } from "@/lib/products";
 import { roleArea } from "@/lib/roles";
@@ -34,6 +35,7 @@ export default async function RolesPage({ searchParams }: Props) {
             Nowa rola powstaje jako kopia istniejącej. Potem możesz zmienić jej nazwę i uprawnienia.
           </p>
           <form method="post" action="/api/roles" className="grid gap-3 sm:grid-cols-2">
+            <IdempotencyField />
             <Select name="copyFromRoleId" label="Na podstawie roli" required defaultValue="">
               <option value="" disabled>
                 Wybierz rolę

@@ -1,5 +1,6 @@
 import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, Select, TextField } from "@monorise-team/ui";
 import Link from "next/link";
+import { IdempotencyField } from "@/components/IdempotencyField";
 import { LoadFailed, Notice } from "@/components/Notice";
 import { UNIT_TYPE_LABELS, buildUnitTree } from "@/lib/units";
 import { load, requirePageSession } from "@/server/page";
@@ -25,6 +26,7 @@ export default async function StructurePage({ searchParams }: Props) {
           <CardTitle>Nowa jednostka</CardTitle>
         </CardHeader>
         <form method="post" action="/api/units" className="grid gap-3 sm:grid-cols-3">
+          <IdempotencyField />
           <TextField name="name" label="Nazwa" required maxLength={120} autoComplete="off" placeholder="np. Kraków" />
           <Select name="type" label="Rodzaj" required defaultValue="TEAM">
             {Object.entries(UNIT_TYPE_LABELS).map(([type, label]) => (
