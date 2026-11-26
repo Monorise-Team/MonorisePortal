@@ -4,7 +4,7 @@ Panel klienta Monorise (`portal.monorise.studio`): Owner i administratorzy firmy
 
 ## Ekrany pierwszej wersji
 
-- **Firma** (`/`) — nazwa, stan firmy, lista domen ze statusem weryfikacji oraz przekazanie roli właściciela innej osobie z aktywnym kontem.
+- **Firma** (`/`) — nazwa i stan firmy, zmiana nazwy firmy, lista domen e-mail ze statusem weryfikacji, dodawanie domen, instrukcja rekordu DNS TXT ze sprawdzaniem DNS (lokalnie także „Potwierdź bez DNS”), zmiana głównej domeny, usuwanie niegłównych domen oraz przekazanie roli właściciela innej osobie z aktywnym kontem.
 - **Pracownicy** (`/employees`) — lista pracowników z ich statusem i informacją o koncie, edycja danych pracownika (imię, nazwisko, stanowisko oraz służbowy e-mail dla osób bez konta), wyłączanie i ponowne włączanie kont logowania, oczekujące zaproszenia (ponowne wysłanie i cofnięcie) oraz zapraszanie nowych osób lub pracowników bez konta.
 - **Struktura** (`/structure` i `/structure/[unitId]`) — drzewo oddziałów, działów i zespołów, dodawanie jednostek, zmiana nazwy, przypisywanie członków i kierowników oraz archiwizacja jednostki.
 - **Role** (`/roles` i `/roles/[roleId]`) — gotowe role Core i produktów oraz własne role firmy, tworzenie kopii roli, zmiana nazwy, opisu i uprawnień własnej roli, przypisywanie i odbieranie ról w firmie albo w wybranej jednostce oraz archiwizacja własnej roli.
@@ -17,6 +17,7 @@ Portal ukrywa formularze tam, gdzie z góry wiadomo, że nie da się wykonać ak
 
 | Działanie                                                             | Wymagane uprawnienie w Core                                                                     |
 | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Dane firmy (zmiana nazwy) i domeny e-mail                             | `core.organization.manage` w całej firmie albo właściciel                                       |
 | Przekazanie roli właściciela                                          | Tylko właściciel firmy                                                                          |
 | Pracownicy (edycja danych, wyłączanie i włączanie kont) i zaproszenia | `core.employees.manage` w całej firmie albo właściciel                                          |
 | Struktura firmy (jednostki i członkostwa)                             | `core.structure.manage` (dla jednostki, jednostki nadrzędnej albo całej firmy) albo właściciel  |
