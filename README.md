@@ -5,10 +5,11 @@ Panel klienta Monorise (`portal.monorise.studio`): Owner i administratorzy firmy
 ## Ekrany pierwszej wersji
 
 - **Firma** (`/`) — nazwa, stan firmy, lista domen ze statusem weryfikacji oraz przekazanie roli właściciela innej osobie z aktywnym kontem.
-- **Pracownicy** (`/employees`) — lista pracowników z ich statusem i informacją o koncie, oczekujące zaproszenia (ponowne wysłanie i cofnięcie) oraz zapraszanie nowych osób lub pracowników bez konta.
+- **Pracownicy** (`/employees`) — lista pracowników z ich statusem i informacją o koncie, edycja danych pracownika (imię, nazwisko, stanowisko oraz służbowy e-mail dla osób bez konta), oczekujące zaproszenia (ponowne wysłanie i cofnięcie) oraz zapraszanie nowych osób lub pracowników bez konta.
 - **Struktura** (`/structure` i `/structure/[unitId]`) — drzewo oddziałów, działów i zespołów, dodawanie jednostek, zmiana nazwy, przypisywanie członków i kierowników oraz archiwizacja jednostki.
 - **Role** (`/roles` i `/roles/[roleId]`) — gotowe role Core i produktów oraz własne role firmy, tworzenie kopii roli, zmiana nazwy, opisu i uprawnień własnej roli, przypisywanie i odbieranie ról w firmie albo w wybranej jednostce oraz archiwizacja własnej roli.
 - **Aplikacje** (`/apps`) — aktywne i historyczne uprawnienia firmy do produktów (np. TimoTime) oraz nadawanie i odbieranie dostępu pracownikom z aktywnym kontem.
+- **Dziennik** (`/audit`) — dziennik zdarzeń firmy od najnowszych z filtrowaniem (osoba, zdarzenie, typ zasobu, zakres dat), rozwijanymi szczegółami (`metadata` oczyszczone przez Core) i stronicowaniem kursorem.
 
 ## Co jest potrzebne do zmiany
 
@@ -17,18 +18,25 @@ Portal ukrywa formularze tam, gdzie z góry wiadomo, że nie da się wykonać ak
 | Działanie                                        | Wymagane uprawnienie w Core                                                                     |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
 | Przekazanie roli właściciela                     | Tylko właściciel firmy                                                                          |
-| Zaproszenia (wysłanie, ponowienie, cofnięcie)    | `core.employees.manage` w całej firmie albo właściciel                                          |
+| Pracownicy (edycja danych) i zaproszenia         | `core.employees.manage` w całej firmie albo właściciel                                          |
 | Struktura firmy (jednostki i członkostwa)        | `core.structure.manage` (dla jednostki, jednostki nadrzędnej albo całej firmy) albo właściciel  |
 | Role (tworzenie, edycja uprawnień, archiwizacja) | `core.roles.manage` w całej firmie albo właściciel                                              |
 | Przypisania ról (nadanie i odebranie)            | `core.roles.assign` w docelowym zakresie oraz posiadanie nadawanych uprawnień (albo właściciel) |
 | Dostęp do aplikacji (nadanie i odebranie)        | `core.app_access.manage` obejmujące jednostki pracownika (albo w całej firmie) lub właściciel   |
+| Dziennik zdarzeń (odczyt)                        | `core.audit.read` w całej firmie albo właściciel                                                |
+
+## Skróty klawiszowe
+
+- `⌘K` / `Ctrl+K` — paleta poleceń
+- `Shift+?` — podgląd skrótów klawiszowych
+- `g f` — Firma, `g p` — Pracownicy, `g s` — Struktura, `g r` — Role, `g a` — Aplikacje, `g d` — Dziennik (gdy osoba ma dostęp), `g w` — Wygląd
 
 ## Jak działa sesja
 
 Logowanie i sesja opierają się na zaszyfrowanym ciasteczku `HttpOnly` (ADR-0098, `@monorise-team/auth/next` w trybie `cookie`):
 
 1. Żądania do stron przechodzą przez `apps/web/src/proxy.ts`, które odświeża wygasającą sesję przed wyrenderowaniem Server Componentu i przekazuje nowe ciasteczko w odpowiedzi oraz do samego żądania.
-2. Formularze HTML wysyłają `POST` na route handlery w `apps/web/src/app/api/**/route.ts` opakowane w `formAction` (`apps/web/src/server/form.ts`), które uwierzytelniają żądanie przez `withAuth` (sesja z ciasteczka i ochrona CSRF) i wykonują zmianę w Core przez `@monorise-team/sdk`.
+2. Formularze HTML wysyłają `POST` na route handlery w `apps/web/src/app/api/**/route.ts` opakowane w `formAction` (`apps/web/src/server/form.ts`), które uwierzytelniają żądanie przez `withAuth` (sesja z ciasteczka i ochrona CSRF) i wykonują zmianę w Core przez `@monorise-team/sdk` (z automatycznym ponawianiem przy przejściowych błędach i stałym nagłówkiem `Idempotency-Key` z formularza dla operacji tworzących).
 3. Po wykonaniu akcji handler zwraca przekierowanie `303` z parametrem `?ok=` albo `?error=`, a przy odmowie z Core zapisuje także krótkotrwałe ciasteczko `portal-error-detail` (ważne 30 s), żeby wyświetlić dokładny powód odmowy na stronie powrotu.
 
 ## Uruchomienie lokalne
