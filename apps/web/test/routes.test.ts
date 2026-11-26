@@ -33,6 +33,8 @@ const fakeCore = {
   resendInvitation: vi.fn(),
   revokeInvitation: vi.fn(),
   updateEmployee: vi.fn(),
+  deactivateEmployee: vi.fn(),
+  reactivateEmployee: vi.fn(),
   transferOrganizationOwner: vi.fn(),
   createUnit: vi.fn(),
   updateUnit: vi.fn(),
@@ -74,6 +76,8 @@ vi.mock("@/server/core", () => ({
 
 import { POST as revokeAppAccessPost } from "@/app/api/app-access/[appAccessId]/revoke/route";
 import { POST as grantAppAccessPost } from "@/app/api/app-access/route";
+import { POST as deactivateEmployeePost } from "@/app/api/employees/[employeeId]/deactivate/route";
+import { POST as reactivateEmployeePost } from "@/app/api/employees/[employeeId]/reactivate/route";
 import { POST as updateEmployeePost } from "@/app/api/employees/[employeeId]/route";
 import { POST as resendInvitationPost } from "@/app/api/invitations/[invitationId]/resend/route";
 import { POST as revokeInvitationPost } from "@/app/api/invitations/[invitationId]/revoke/route";
@@ -379,6 +383,88 @@ describe("trasy formularzy Portalu", () => {
       );
       expectRedirect(badId, "/employees", { error: "VALIDATION_FAILED" });
       expect(fakeCore.updateEmployee).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("POST /api/employees/[employeeId]/deactivate i reactivate", () => {
+    it("wyłącza konto z przekazaniem Idempotency-Key i wraca z komunikatem sukcesu", async () => {
+      const res = await deactivateEmployeePost(
+        post(`/api/employees/${UUID_1}/deactivate`, formOf({ idempotencyKey: UUID_2 })),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expect(fakeCore.deactivateEmployee).toHaveBeenCalledWith({
+        path: { employeeId: UUID_1 },
+        headers: { "Idempotency-Key": UUID_2 },
+      });
+      expectRedirect(res, "/employees", { ok: "account-deactivated" });
+    });
+
+    it("włącza konto ponownie z przekazaniem Idempotency-Key i wraca z komunikatem sukcesu", async () => {
+      const res = await reactivateEmployeePost(
+        post(`/api/employees/${UUID_1}/reactivate`, formOf({ idempotencyKey: UUID_3 })),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expect(fakeCore.reactivateEmployee).toHaveBeenCalledWith({
+        path: { employeeId: UUID_1 },
+        headers: { "Idempotency-Key": UUID_3 },
+      });
+      expectRedirect(res, "/employees", { ok: "account-reactivated" });
+    });
+
+    it("mapuje błędy Core 409, 403 i 404 na komunikat błędu dla wyłączenia i włączenia", async () => {
+      const conflictMsg = "Nie można wyłączyć konta właściciela firmy";
+      fakeCore.deactivateEmployee.mockRejectedValueOnce(coreError("CONFLICT", conflictMsg, 409));
+      const deactivateConflict = await deactivateEmployeePost(post(`/api/employees/${UUID_1}/deactivate`), {
+        params: Promise.resolve({ employeeId: UUID_1 }),
+      });
+      expectRedirect(deactivateConflict, "/employees", { error: "CONFLICT" }, conflictMsg);
+
+      const deniedMsg = "Brak uprawnień do zarządzania pracownikami";
+      fakeCore.deactivateEmployee.mockRejectedValueOnce(coreError("PERMISSION_DENIED", deniedMsg, 403));
+      const deactivateDenied = await deactivateEmployeePost(post(`/api/employees/${UUID_1}/deactivate`), {
+        params: Promise.resolve({ employeeId: UUID_1 }),
+      });
+      expectRedirect(deactivateDenied, "/employees", { error: "PERMISSION_DENIED" }, deniedMsg);
+
+      const reactivateConflictMsg = "Konto nie zostało jeszcze aktywowane";
+      fakeCore.reactivateEmployee.mockRejectedValueOnce(coreError("CONFLICT", reactivateConflictMsg, 409));
+      const reactivateConflict = await reactivateEmployeePost(post(`/api/employees/${UUID_1}/reactivate`), {
+        params: Promise.resolve({ employeeId: UUID_1 }),
+      });
+      expectRedirect(reactivateConflict, "/employees", { error: "CONFLICT" }, reactivateConflictMsg);
+
+      const notFoundMsg = "Nie znaleziono pracownika";
+      fakeCore.reactivateEmployee.mockRejectedValueOnce(coreError("NOT_FOUND", notFoundMsg, 404));
+      const reactivateNotFound = await reactivateEmployeePost(post(`/api/employees/${UUID_1}/reactivate`), {
+        params: Promise.resolve({ employeeId: UUID_1 }),
+      });
+      expectRedirect(reactivateNotFound, "/employees", { error: "NOT_FOUND" }, notFoundMsg);
+    });
+
+    it("bez sesji przekierowuje na logowanie i odrzuca nieprawidłowe employeeId bez pytania Core", async () => {
+      authState.unauthenticated = true;
+      const unauthDeactivate = await deactivateEmployeePost(post(`/api/employees/${UUID_1}/deactivate`), {
+        params: Promise.resolve({ employeeId: UUID_1 }),
+      });
+      expectRedirect(unauthDeactivate, "/api/auth/sign-in", { returnTo: "/employees" });
+
+      const unauthReactivate = await reactivateEmployeePost(post(`/api/employees/${UUID_1}/reactivate`), {
+        params: Promise.resolve({ employeeId: UUID_1 }),
+      });
+      expectRedirect(unauthReactivate, "/api/auth/sign-in", { returnTo: "/employees" });
+
+      authState.unauthenticated = false;
+      const badDeactivateId = await deactivateEmployeePost(post("/api/employees/not-a-uuid/deactivate"), {
+        params: Promise.resolve({ employeeId: "not-a-uuid" }),
+      });
+      expectRedirect(badDeactivateId, "/employees", { error: "VALIDATION_FAILED" });
+
+      const badReactivateId = await reactivateEmployeePost(post("/api/employees/not-a-uuid/reactivate"), {
+        params: Promise.resolve({ employeeId: "not-a-uuid" }),
+      });
+      expectRedirect(badReactivateId, "/employees", { error: "VALIDATION_FAILED" });
+      expect(fakeCore.deactivateEmployee).not.toHaveBeenCalled();
+      expect(fakeCore.reactivateEmployee).not.toHaveBeenCalled();
     });
   });
 

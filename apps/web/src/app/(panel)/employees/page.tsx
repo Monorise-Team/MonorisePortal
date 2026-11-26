@@ -1,6 +1,7 @@
 import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, TextField } from "@monorise-team/ui";
 import { IdempotencyField } from "@/components/IdempotencyField";
 import { LoadFailed, Notice } from "@/components/Notice";
+import { employeeAccountAction } from "@/lib/employees";
 import { load, requirePageSession } from "@/server/page";
 
 interface Props {
@@ -13,19 +14,30 @@ const EMPLOYEE_STATUS: Record<string, { label: string; tone: "success" | "neutra
   ANONYMIZED: { label: "zanonimizowany", tone: "neutral" },
 };
 
+const ACCOUNT_STATUS: Record<string, { label: string; tone: "warning" | "danger" }> = {
+  DEACTIVATED: { label: "wyłączone", tone: "danger" },
+};
+
 const dateFormat = new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium", timeZone: "Europe/Warsaw" });
 
-/** Pracownicy: lista, edycja danych, oczekujące zaproszenia (ponowne wysłanie, cofnięcie) i zapraszanie nowych osób. */
+/**
+ * Pracownicy: lista, edycja danych, wyłączanie i włączanie kont, oczekujące zaproszenia
+ * (ponowne wysłanie, cofnięcie) i zapraszanie nowych osób.
+ */
 export default async function EmployeesPage({ searchParams }: Props) {
   const { ok, error } = await searchParams;
-  const { core } = await requirePageSession();
-  const [employees, invitations] = await Promise.all([
+  const { core, session } = await requirePageSession();
+  const [employees, invitations, me] = await Promise.all([
     load(() => core.listEmployees({ query: { limit: 100 } })),
     load(() => core.listInvitations({ query: { status: "PENDING", limit: 100 } })),
+    load(() => core.getMe()),
   ]);
 
   const canManageEmployees = invitations.ok;
   const pendingEmployees = new Set(invitations.ok ? invitations.data.items.map((item) => item.employeeId) : []);
+  const currentPerson = me.ok
+    ? { accountId: me.data.account.id, employeeId: me.data.employee.id }
+    : { accountId: session.context.accountId, employeeId: session.context.employeeId };
 
   return (
     <>
@@ -99,6 +111,8 @@ export default async function EmployeesPage({ searchParams }: Props) {
           <ul className="divide-y divide-border-primary">
             {employees.data.items.map((employee) => {
               const status = EMPLOYEE_STATUS[employee.status] ?? { label: employee.status, tone: "neutral" as const };
+              const accountStatus = employee.accountStatus ? ACCOUNT_STATUS[employee.accountStatus] : undefined;
+              const accountAction = canManageEmployees ? employeeAccountAction(employee, currentPerson) : null;
               const editKey = `${employee.firstName}|${employee.lastName}|${employee.jobTitle ?? ""}|${employee.workEmail ?? ""}`;
               return (
                 <li key={employee.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -110,8 +124,9 @@ export default async function EmployeesPage({ searchParams }: Props) {
                       {[employee.workEmail, employee.jobTitle].filter(Boolean).join(" · ") || "bez adresu e-mail"}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {!employee.accountId && <Badge tone="warning">bez konta</Badge>}
+                    {accountStatus && <Badge tone={accountStatus.tone}>{accountStatus.label}</Badge>}
                     {pendingEmployees.has(employee.id) && <Badge tone="accent">zaproszenie wysłane</Badge>}
                     <Badge tone={status.tone}>{status.label}</Badge>
                   </div>
@@ -200,6 +215,40 @@ export default async function EmployeesPage({ searchParams }: Props) {
                         </Button>
                       </form>
                     </details>
+                  )}
+                  {accountAction === "deactivate" && (
+                    <details className="w-full pt-1">
+                      <summary className="inline-flex cursor-pointer items-center text-xs font-medium text-danger hover:underline">
+                        Wyłącz konto
+                        <span className="sr-only">
+                          : {employee.firstName} {employee.lastName}
+                        </span>
+                      </summary>
+                      <form
+                        method="post"
+                        action={`/api/employees/${employee.id}/deactivate`}
+                        className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-control border border-border-primary p-3"
+                      >
+                        <IdempotencyField />
+                        <p className="text-xs text-text-secondary">
+                          Czy na pewno? Osoba nie zaloguje się do aplikacji Monorise, dopóki nie włączysz konta.
+                        </p>
+                        <Button type="submit" variant="danger" size="sm">
+                          Wyłącz konto
+                        </Button>
+                      </form>
+                    </details>
+                  )}
+                  {accountAction === "reactivate" && (
+                    <form method="post" action={`/api/employees/${employee.id}/reactivate`} className="w-full pt-1">
+                      <IdempotencyField />
+                      <Button type="submit" variant="outline" size="sm">
+                        Włącz konto
+                        <span className="sr-only">
+                          : {employee.firstName} {employee.lastName}
+                        </span>
+                      </Button>
+                    </form>
                   )}
                 </li>
               );
