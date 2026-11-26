@@ -1,4 +1,5 @@
 import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, Select } from "@monorise-team/ui";
+import { IdempotencyField } from "@/components/IdempotencyField";
 import { LoadFailed, Notice } from "@/components/Notice";
 import { hasActiveAccount, namesByAccount } from "@/lib/employees";
 import { productLabel } from "@/lib/products";
@@ -108,6 +109,7 @@ export default async function AppsPage({ searchParams }: Props) {
                       <p className="text-sm text-text-tertiary">Wszyscy pracownicy z kontem mają już dostęp.</p>
                     ) : (
                       <form method="post" action="/api/app-access" className="flex flex-wrap items-end gap-3">
+                        <IdempotencyField />
                         <input type="hidden" name="product" value={entitlement.product} />
                         <Select name="accountId" label="Nadaj dostęp" required defaultValue="">
                           <option value="" disabled>

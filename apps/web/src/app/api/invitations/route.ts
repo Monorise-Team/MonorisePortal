@@ -1,3 +1,4 @@
+import { idempotencyHeaders } from "@/lib/idempotency";
 import { field, formAction, required } from "@/server/form";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export const POST = formAction("/employees", async ({ core, form }) => {
     body: employeeId
       ? { email, employeeId }
       : { email, firstName: required(form, "firstName"), lastName: required(form, "lastName") },
+    headers: idempotencyHeaders(form),
   });
   return { ok: "invited" };
 });

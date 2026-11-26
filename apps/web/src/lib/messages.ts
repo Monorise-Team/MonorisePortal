@@ -3,6 +3,7 @@ export const OK_MESSAGES: Record<string, string> = {
   invited: "Zaproszenie wysłane.",
   resent: "Zaproszenie wysłane ponownie.",
   revoked: "Zaproszenie cofnięte.",
+  "employee-updated": "Dane pracownika zapisane.",
   "owner-transferred": "Właściciel firmy zmieniony.",
   "unit-created": "Jednostka dodana.",
   "unit-updated": "Nazwa zmieniona.",

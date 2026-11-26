@@ -7,13 +7,19 @@ export const dynamic = "force-dynamic";
 /** Układ panelu: szkielet z biblioteki (tło, pasek boczny, paleta poleceń) z firmą i zalogowaną osobą z Core. */
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const { core } = await requirePageSession();
-  const me = await load(() => core.getMe());
+  const [me, auditAccess] = await Promise.all([
+    load(() => core.getMe()),
+    load(() => core.listAuditLog({ query: { limit: 1 } })),
+  ]);
+  const isOwner = me.ok && me.data.account.isOwner;
+  const canReadAudit = isOwner || auditAccess.ok;
 
   return (
     <PanelShell
       organizationName={me.ok ? me.data.organization.name : "Twoja firma"}
       personName={me.ok ? `${me.data.employee.firstName} ${me.data.employee.lastName}` : null}
-      isOwner={me.ok && me.data.account.isOwner}
+      isOwner={isOwner}
+      canReadAudit={canReadAudit}
     >
       {children}
     </PanelShell>
