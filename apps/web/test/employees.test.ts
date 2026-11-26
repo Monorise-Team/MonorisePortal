@@ -1,6 +1,6 @@
 import type { Employee } from "@monorise-team/sdk";
 import { describe, expect, it } from "vitest";
-import { hasActiveAccount, namesByAccount } from "../src/lib/employees";
+import { employeeAccountAction, hasActiveAccount, namesByAccount } from "../src/lib/employees";
 
 const employee = (overrides: Partial<Employee>): Employee => ({
   id: "01936f4e-9b2c-7d4e-8f5a-000000000001",
@@ -29,5 +29,26 @@ describe("pracownicy w wyborach Portalu", () => {
       employee({ accountId: null, accountStatus: null, firstName: "Piotr" }),
     ]);
     expect([...names]).toEqual([["a", "Ewa Zielińska"]]);
+  });
+
+  it("pokazuje wyłączanie lub włączanie konta poza własnym kontem i przypadkami odrzucanymi przez Core", () => {
+    const current = {
+      accountId: "01936f4e-8a1b-7c3d-9e2f-000000000099",
+      employeeId: "01936f4e-9b2c-7d4e-8f5a-000000000099",
+    };
+
+    expect(employeeAccountAction(employee({}), current)).toBe("deactivate");
+    expect(employeeAccountAction(employee({ status: "FORMER" }), current)).toBe("deactivate");
+    expect(employeeAccountAction(employee({ accountStatus: "DEACTIVATED" }), current)).toBe("reactivate");
+    expect(employeeAccountAction(employee({ status: "FORMER", accountStatus: "DEACTIVATED" }), current)).toBe(
+      "reactivate",
+    );
+
+    expect(employeeAccountAction(employee({ accountId: current.accountId }), current)).toBeNull();
+    expect(employeeAccountAction(employee({ id: current.employeeId }), current)).toBeNull();
+    expect(employeeAccountAction(employee({}), null)).toBeNull();
+    expect(employeeAccountAction(employee({ accountId: null, accountStatus: null }), current)).toBeNull();
+    expect(employeeAccountAction(employee({ accountStatus: "INVITED" }), current)).toBeNull();
+    expect(employeeAccountAction(employee({ status: "ANONYMIZED", accountStatus: "DEACTIVATED" }), current)).toBeNull();
   });
 });
