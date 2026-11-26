@@ -127,6 +127,7 @@ describe("filtry i formatowanie dziennika zdarzeń", () => {
     );
 
     expect(formatAuditResourceType("app_access")).toBe("Dostęp do aplikacji");
+    expect(formatAuditResourceType("organization_domain")).toBe("Domena firmy");
     expect(formatAuditResourceType("custom_entity")).toBe("custom_entity");
 
     expect(formatAuditDateTime("2026-11-25T13:05:00.000Z")).toContain("14:05");

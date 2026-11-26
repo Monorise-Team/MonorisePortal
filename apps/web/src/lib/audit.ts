@@ -70,6 +70,7 @@ export const AUDIT_RESOURCE_TYPE_LABELS: Readonly<Record<string, string>> = {
   organization: "Firma",
   employee: "Pracownik",
   account: "Konto",
+  organization_domain: "Domena firmy",
   invitation: "Zaproszenie",
   unit: "Jednostka",
   unit_member: "Członkostwo w jednostce",
