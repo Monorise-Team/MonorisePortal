@@ -5,7 +5,7 @@ Panel klienta Monorise (`portal.monorise.studio`): Owner i administratorzy firmy
 ## Ekrany pierwszej wersji
 
 - **Firma** (`/`) — nazwa, stan firmy, lista domen ze statusem weryfikacji oraz przekazanie roli właściciela innej osobie z aktywnym kontem.
-- **Pracownicy** (`/employees`) — lista pracowników z ich statusem i informacją o koncie, edycja danych pracownika (imię, nazwisko, stanowisko oraz służbowy e-mail dla osób bez konta), oczekujące zaproszenia (ponowne wysłanie i cofnięcie) oraz zapraszanie nowych osób lub pracowników bez konta.
+- **Pracownicy** (`/employees`) — lista pracowników z ich statusem i informacją o koncie, edycja danych pracownika (imię, nazwisko, stanowisko oraz służbowy e-mail dla osób bez konta), wyłączanie i ponowne włączanie kont logowania, oczekujące zaproszenia (ponowne wysłanie i cofnięcie) oraz zapraszanie nowych osób lub pracowników bez konta.
 - **Struktura** (`/structure` i `/structure/[unitId]`) — drzewo oddziałów, działów i zespołów, dodawanie jednostek, zmiana nazwy, przypisywanie członków i kierowników oraz archiwizacja jednostki.
 - **Role** (`/roles` i `/roles/[roleId]`) — gotowe role Core i produktów oraz własne role firmy, tworzenie kopii roli, zmiana nazwy, opisu i uprawnień własnej roli, przypisywanie i odbieranie ról w firmie albo w wybranej jednostce oraz archiwizacja własnej roli.
 - **Aplikacje** (`/apps`) — aktywne i historyczne uprawnienia firmy do produktów (np. TimoTime) oraz nadawanie i odbieranie dostępu pracownikom z aktywnym kontem.
@@ -15,15 +15,15 @@ Panel klienta Monorise (`portal.monorise.studio`): Owner i administratorzy firmy
 
 Portal ukrywa formularze tam, gdzie z góry wiadomo, że nie da się wykonać akcji, ale każdą zmianę ostatecznie sprawdza Core. Gdy brakuje uprawnienia do odczytu wybranej listy lub fragmentu strony, Portal wyświetla komunikat „Nie masz uprawnienia, żeby to zobaczyć.”.
 
-| Działanie                                        | Wymagane uprawnienie w Core                                                                     |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| Przekazanie roli właściciela                     | Tylko właściciel firmy                                                                          |
-| Pracownicy (edycja danych) i zaproszenia         | `core.employees.manage` w całej firmie albo właściciel                                          |
-| Struktura firmy (jednostki i członkostwa)        | `core.structure.manage` (dla jednostki, jednostki nadrzędnej albo całej firmy) albo właściciel  |
-| Role (tworzenie, edycja uprawnień, archiwizacja) | `core.roles.manage` w całej firmie albo właściciel                                              |
-| Przypisania ról (nadanie i odebranie)            | `core.roles.assign` w docelowym zakresie oraz posiadanie nadawanych uprawnień (albo właściciel) |
-| Dostęp do aplikacji (nadanie i odebranie)        | `core.app_access.manage` obejmujące jednostki pracownika (albo w całej firmie) lub właściciel   |
-| Dziennik zdarzeń (odczyt)                        | `core.audit.read` w całej firmie albo właściciel                                                |
+| Działanie                                                             | Wymagane uprawnienie w Core                                                                     |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Przekazanie roli właściciela                                          | Tylko właściciel firmy                                                                          |
+| Pracownicy (edycja danych, wyłączanie i włączanie kont) i zaproszenia | `core.employees.manage` w całej firmie albo właściciel                                          |
+| Struktura firmy (jednostki i członkostwa)                             | `core.structure.manage` (dla jednostki, jednostki nadrzędnej albo całej firmy) albo właściciel  |
+| Role (tworzenie, edycja uprawnień, archiwizacja)                      | `core.roles.manage` w całej firmie albo właściciel                                              |
+| Przypisania ról (nadanie i odebranie)                                 | `core.roles.assign` w docelowym zakresie oraz posiadanie nadawanych uprawnień (albo właściciel) |
+| Dostęp do aplikacji (nadanie i odebranie)                             | `core.app_access.manage` obejmujące jednostki pracownika (albo w całej firmie) lub właściciel   |
+| Dziennik zdarzeń (odczyt)                                             | `core.audit.read` w całej firmie albo właściciel                                                |
 
 ## Skróty klawiszowe
 
