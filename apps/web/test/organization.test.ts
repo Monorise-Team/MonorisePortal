@@ -108,6 +108,7 @@ describe("dane firmy i domeny e-mail", () => {
     expect(DOMAIN_STATUS.REVOKED.label).toBe("wycofana");
 
     expect(OK_MESSAGES["organization-updated"]).toBe("Nazwa firmy zapisana.");
+    expect(OK_MESSAGES["organization-work-settings-updated"]).toBe("Ustawienia czasu pracy zapisane.");
     expect(OK_MESSAGES["domain-added"]).toBe("Domena dodana. Dodaj rekord TXT w DNS i kliknij „Sprawdź DNS”.");
     expect(OK_MESSAGES["domain-verified"]).toBe("Domena zweryfikowana.");
     expect(OK_MESSAGES["domain-primary-changed"]).toBe("Domena główna zmieniona.");
