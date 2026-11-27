@@ -1,6 +1,7 @@
 import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, Select, TextField } from "@monorise-team/ui";
 import { IdempotencyField } from "@/components/IdempotencyField";
 import { LoadFailed, Notice } from "@/components/Notice";
+import { WorkScheduleEditor } from "@/components/WorkScheduleEditor";
 import { hasActiveAccount } from "@/lib/employees";
 import {
   DOMAIN_STATUS,
@@ -12,6 +13,12 @@ import {
   formatDomainDateTime,
   hasOrganizationManagePermission,
 } from "@/lib/organization";
+import {
+  formatScheduleSummary,
+  formatWeeklySummary,
+  getTimeZoneOptions,
+  serializeWorkScheduleKey,
+} from "@/lib/work-schedule";
 import { load, requirePageSession } from "@/server/page";
 
 interface Props {
@@ -19,8 +26,8 @@ interface Props {
 }
 
 /**
- * Firma: dane firmy (zmiana nazwy), domeny e-mail (dodawanie, weryfikacja DNS TXT, wybór głównej, usuwanie)
- * oraz przekazanie roli właściciela (tylko właściciel).
+ * Firma: dane firmy (zmiana nazwy), czas pracy (strefa czasowa i domyślny wymiar pracy), domeny e-mail
+ * (dodawanie, weryfikacja DNS TXT, wybór głównej, usuwanie) oraz przekazanie roli właściciela (tylko właściciel).
  */
 export default async function CompanyPage({ searchParams }: Props) {
   const { ok, error } = await searchParams;
@@ -57,6 +64,11 @@ export default async function CompanyPage({ searchParams }: Props) {
         tone: "warning" as const,
       })
     : null;
+
+  const timeZoneGroups = organization.ok ? getTimeZoneOptions(organization.data.timeZone) : null;
+  const workSettingsKey = organization.ok
+    ? `${organization.data.timeZone}|${serializeWorkScheduleKey(organization.data.defaultWorkSchedule)}`
+    : "";
 
   return (
     <>
@@ -104,6 +116,65 @@ export default async function CompanyPage({ searchParams }: Props) {
               <dt className="text-text-tertiary">Stan</dt>
               <dd>
                 <Badge tone={orgStatus.tone}>{orgStatus.label}</Badge>
+              </dd>
+            </dl>
+          )
+        ) : (
+          <LoadFailed code={organization.ok ? "INTERNAL" : organization.code} />
+        )}
+      </Card>
+
+      <Card id="czas-pracy" className="scroll-mt-4 p-4">
+        <CardHeader>
+          <CardTitle>Czas pracy</CardTitle>
+        </CardHeader>
+        {organization.ok && timeZoneGroups ? (
+          canManageOrganization ? (
+            <form key={workSettingsKey} method="post" action="/api/organization" className="flex flex-col gap-4">
+              <Select
+                name="timeZone"
+                label="Strefa czasowa"
+                required
+                defaultValue={organization.data.timeZone}
+                hint="Strefa czasowa firmy używana w rozliczeniach czasu pracy."
+                className="sm:max-w-sm"
+              >
+                <optgroup label="Najczęstsze">
+                  {timeZoneGroups.common.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {zone}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Wszystkie strefy czasowe">
+                  {timeZoneGroups.other.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {zone}
+                    </option>
+                  ))}
+                </optgroup>
+              </Select>
+
+              <WorkScheduleEditor
+                variant="organization"
+                fieldPrefix="defaultWorkSchedule"
+                legend="Domyślny wymiar pracy"
+                initialSchedule={organization.data.defaultWorkSchedule}
+              />
+
+              <Button type="submit" variant="primary" className="self-start">
+                Zapisz czas pracy
+              </Button>
+            </form>
+          ) : (
+            <dl className="grid gap-3 text-sm sm:grid-cols-[12rem_1fr]">
+              <dt className="text-text-tertiary">Strefa czasowa</dt>
+              <dd className="text-text-primary">{organization.data.timeZone}</dd>
+              <dt className="text-text-tertiary">Domyślny wymiar pracy</dt>
+              <dd className="text-text-primary">
+                {organization.data.defaultWorkSchedule !== null
+                  ? `${formatScheduleSummary(organization.data.defaultWorkSchedule)} (${formatWeeklySummary(organization.data.defaultWorkSchedule)})`
+                  : "Nie ustawiono"}
               </dd>
             </dl>
           )

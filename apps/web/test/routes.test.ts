@@ -228,6 +228,90 @@ describe("trasy formularzy Portalu", () => {
       const denied = await updateOrganizationPost(post("/api/organization", formOf({ name: "Acme Europe" })));
       expectRedirect(denied, "/", { error: "PERMISSION_DENIED" }, deniedMsg);
     });
+
+    it("zapisuje strefę czasową i domyślny wymiar pracy firmy (własny, pusty i null)", async () => {
+      const custom = await updateOrganizationPost(
+        post(
+          "/api/organization",
+          formOf({
+            timeZone: "Europe/Berlin",
+            defaultWorkScheduleMode: "custom",
+            "defaultWorkSchedule.day.1": "8",
+            "defaultWorkSchedule.day.2": "8",
+            "defaultWorkSchedule.day.3": "8",
+            "defaultWorkSchedule.day.4": "8",
+            "defaultWorkSchedule.day.5": "7,5",
+          }),
+        ),
+      );
+      expect(fakeCore.updateOrganization).toHaveBeenCalledWith({
+        body: {
+          timeZone: "Europe/Berlin",
+          defaultWorkSchedule: { 1: 480, 2: 480, 3: 480, 4: 480, 5: 450 },
+        },
+      });
+      expectRedirect(custom, "/", { ok: "organization-work-settings-updated" });
+
+      const cleared = await updateOrganizationPost(
+        post("/api/organization", formOf({ timeZone: "UTC", defaultWorkScheduleMode: "custom" })),
+      );
+      expect(fakeCore.updateOrganization).toHaveBeenLastCalledWith({
+        body: { timeZone: "UTC", defaultWorkSchedule: {} },
+      });
+      expectRedirect(cleared, "/", { ok: "organization-work-settings-updated" });
+
+      const none = await updateOrganizationPost(
+        post("/api/organization", formOf({ timeZone: "Europe/Warsaw", defaultWorkScheduleMode: "null" })),
+      );
+      expect(fakeCore.updateOrganization).toHaveBeenLastCalledWith({
+        body: { timeZone: "Europe/Warsaw", defaultWorkSchedule: null },
+      });
+      expectRedirect(none, "/", { ok: "organization-work-settings-updated" });
+    });
+
+    it("odrzuca błędny domyślny wymiar pracy bez pytania Core i przekazuje 422 oraz 403 z Core", async () => {
+      const emptyForm = await updateOrganizationPost(post("/api/organization", new FormData()));
+      expectRedirect(emptyForm, "/", { error: "VALIDATION_FAILED" });
+
+      const badHours = await updateOrganizationPost(
+        post(
+          "/api/organization",
+          formOf({
+            timeZone: "Europe/Warsaw",
+            defaultWorkScheduleMode: "custom",
+            "defaultWorkSchedule.day.1": "25",
+          }),
+        ),
+      );
+      expectRedirect(
+        badHours,
+        "/",
+        { error: "VALIDATION_FAILED" },
+        "Poniedziałek: Liczba godzin w jednym dniu musi być od 0 do 24.",
+      );
+      expect(fakeCore.updateOrganization).not.toHaveBeenCalled();
+
+      fakeCore.updateOrganization.mockRejectedValueOnce(
+        new CoreApiError({
+          status: 422,
+          code: "VALIDATION_FAILED",
+          message: "Błąd walidacji",
+          details: [{ field: "timeZone", message: "Nieznana strefa czasowa IANA." }],
+          requestId: "req-tz",
+        }),
+      );
+      const invalidTz = await updateOrganizationPost(
+        post("/api/organization", formOf({ timeZone: "Mars/Olympus", defaultWorkScheduleMode: "null" })),
+      );
+      expectRedirect(invalidTz, "/", { error: "VALIDATION_FAILED" }, "Strefa czasowa: Nieznana strefa czasowa IANA.");
+
+      const deniedMsg = "Brak uprawnień do zarządzania firmą";
+      fakeCore.updateOrganization.mockRejectedValueOnce(coreError("PERMISSION_DENIED", deniedMsg, 403));
+      const denied = await updateOrganizationPost(
+        post("/api/organization", formOf({ timeZone: "Europe/London", defaultWorkScheduleMode: "null" })),
+      );
+      expectRedirect(denied, "/", { error: "PERMISSION_DENIED" }, deniedMsg);
+    });
   });
 
   describe("POST /api/organization/domains", () => {
@@ -645,6 +729,114 @@ describe("trasy formularzy Portalu", () => {
       );
       expectRedirect(badId, "/employees", { error: "VALIDATION_FAILED" });
       expect(fakeCore.updateEmployee).not.toHaveBeenCalled();
+    });
+
+    it("zapisuje wymiar pracy pracownika (własny, wszystkie dni wolne i grafik firmy)", async () => {
+      const custom = await updateEmployeePost(
+        post(
+          `/api/employees/${UUID_1}`,
+          formOf({
+            firstName: "Jan",
+            lastName: "Kowalski",
+            workScheduleMode: "custom",
+            "workSchedule.day.1": "4",
+            "workSchedule.day.3": "4",
+            "workSchedule.day.5": "4",
+          }),
+        ),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expect(fakeCore.updateEmployee).toHaveBeenCalledWith({
+        path: { employeeId: UUID_1 },
+        body: {
+          firstName: "Jan",
+          lastName: "Kowalski",
+          jobTitle: null,
+          workSchedule: { 1: 240, 3: 240, 5: 240 },
+        },
+      });
+      expectRedirect(custom, "/employees", { ok: "employee-updated" });
+
+      const allOff = await updateEmployeePost(
+        post(
+          `/api/employees/${UUID_1}`,
+          formOf({ firstName: "Jan", lastName: "Kowalski", workScheduleMode: "custom" }),
+        ),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expect(fakeCore.updateEmployee).toHaveBeenLastCalledWith({
+        path: { employeeId: UUID_1 },
+        body: { firstName: "Jan", lastName: "Kowalski", jobTitle: null, workSchedule: {} },
+      });
+      expectRedirect(allOff, "/employees", { ok: "employee-updated" });
+
+      const companyDefault = await updateEmployeePost(
+        post(`/api/employees/${UUID_1}`, formOf({ firstName: "Jan", lastName: "Kowalski", workScheduleMode: "null" })),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expect(fakeCore.updateEmployee).toHaveBeenLastCalledWith({
+        path: { employeeId: UUID_1 },
+        body: { firstName: "Jan", lastName: "Kowalski", jobTitle: null, workSchedule: null },
+      });
+      expectRedirect(companyDefault, "/employees", { ok: "employee-updated" });
+    });
+
+    it("odrzuca błędne godziny wymiaru pracy i przekazuje błędy 422 oraz 403 z Core", async () => {
+      const badInput = await updateEmployeePost(
+        post(
+          `/api/employees/${UUID_1}`,
+          formOf({
+            firstName: "Jan",
+            lastName: "Kowalski",
+            workScheduleMode: "custom",
+            "workSchedule.day.2": "abc",
+          }),
+        ),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expectRedirect(
+        badInput,
+        "/employees",
+        { error: "VALIDATION_FAILED" },
+        "Wtorek: Wpisz liczbę godzin od 0 do 24, na przykład 8 albo 7,5.",
+      );
+      expect(fakeCore.updateEmployee).not.toHaveBeenCalled();
+
+      fakeCore.updateEmployee.mockRejectedValueOnce(
+        new CoreApiError({
+          status: 422,
+          code: "VALIDATION_FAILED",
+          message: "Błąd walidacji",
+          details: [{ field: "workSchedule.1", message: "Wartość musi być od 0 do 1440." }],
+          requestId: "req-ws",
+        }),
+      );
+      const core422 = await updateEmployeePost(
+        post(
+          `/api/employees/${UUID_1}`,
+          formOf({
+            firstName: "Jan",
+            lastName: "Kowalski",
+            workScheduleMode: "custom",
+            "workSchedule.day.1": "8",
+          }),
+        ),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expectRedirect(
+        core422,
+        "/employees",
+        { error: "VALIDATION_FAILED" },
+        "Poniedziałek: Wartość musi być od 0 do 1440.",
+      );
+
+      const deniedMsg = "Brak uprawnień do zarządzania pracownikami";
+      fakeCore.updateEmployee.mockRejectedValueOnce(coreError("PERMISSION_DENIED", deniedMsg, 403));
+      const denied = await updateEmployeePost(
+        post(`/api/employees/${UUID_1}`, formOf({ firstName: "Jan", lastName: "Kowalski", workScheduleMode: "null" })),
+        { params: Promise.resolve({ employeeId: UUID_1 }) },
+      );
+      expectRedirect(denied, "/employees", { error: "PERMISSION_DENIED" }, deniedMsg);
     });
   });
 

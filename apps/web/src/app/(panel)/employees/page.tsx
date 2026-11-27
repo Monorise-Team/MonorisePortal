@@ -1,8 +1,10 @@
 import { Badge, Button, Card, CardHeader, CardTitle, EmptyState, TextField } from "@monorise-team/ui";
 import { IdempotencyField } from "@/components/IdempotencyField";
 import { LoadFailed, Notice } from "@/components/Notice";
+import { WorkScheduleEditor } from "@/components/WorkScheduleEditor";
 import { employeeAccountAction } from "@/lib/employees";
 import { invitationDeliveryView } from "@/lib/invitations";
+import { formatScheduleSummary, serializeWorkScheduleKey } from "@/lib/work-schedule";
 import { load, requirePageSession } from "@/server/page";
 
 interface Props {
@@ -35,6 +37,8 @@ export default async function EmployeesPage({ searchParams }: Props) {
   ]);
 
   const canManageEmployees = invitations.ok;
+  const companyDefaultSchedule = me.ok ? me.data.organization.defaultWorkSchedule : null;
+  const companyDefaultKey = serializeWorkScheduleKey(companyDefaultSchedule);
   const pendingEmployees = new Set(invitations.ok ? invitations.data.items.map((item) => item.employeeId) : []);
   const currentPerson = me.ok
     ? { accountId: me.data.account.id, employeeId: me.data.employee.id }
@@ -125,7 +129,7 @@ export default async function EmployeesPage({ searchParams }: Props) {
               const status = EMPLOYEE_STATUS[employee.status] ?? { label: employee.status, tone: "neutral" as const };
               const accountStatus = employee.accountStatus ? ACCOUNT_STATUS[employee.accountStatus] : undefined;
               const accountAction = canManageEmployees ? employeeAccountAction(employee, currentPerson) : null;
-              const editKey = `${employee.firstName}|${employee.lastName}|${employee.jobTitle ?? ""}|${employee.workEmail ?? ""}`;
+              const editKey = `${employee.firstName}|${employee.lastName}|${employee.jobTitle ?? ""}|${employee.workEmail ?? ""}|${serializeWorkScheduleKey(employee.workSchedule)}|${companyDefaultKey}`;
               return (
                 <li key={employee.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="text-sm">
@@ -135,6 +139,11 @@ export default async function EmployeesPage({ searchParams }: Props) {
                     <p className="text-text-tertiary">
                       {[employee.workEmail, employee.jobTitle].filter(Boolean).join(" · ") || "bez adresu e-mail"}
                     </p>
+                    {employee.status !== "ANONYMIZED" && (
+                      <p className="text-xs text-text-tertiary">
+                        Wymiar pracy: {formatScheduleSummary(employee.workSchedule)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {!employee.accountId && <Badge tone="warning">bez konta</Badge>}
@@ -222,6 +231,15 @@ export default async function EmployeesPage({ searchParams }: Props) {
                             hint="Adres w zweryfikowanej domenie firmy. Zostaw puste, żeby usunąć."
                           />
                         )}
+                        <div className="sm:col-span-2">
+                          <WorkScheduleEditor
+                            variant="employee"
+                            fieldPrefix="workSchedule"
+                            legend="Wymiar pracy"
+                            initialSchedule={employee.workSchedule}
+                            companyDefaultSchedule={companyDefaultSchedule}
+                          />
+                        </div>
                         <Button type="submit" variant="primary" size="sm" className="self-start sm:col-span-2">
                           Zapisz dane
                         </Button>
