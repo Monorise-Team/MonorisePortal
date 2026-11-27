@@ -10,6 +10,7 @@ Panel klienta Monorise (`portal.monorise.studio`): Owner i administratorzy firmy
 - **Role** (`/roles` i `/roles/[roleId]`) — gotowe role Core i produktów oraz własne role firmy, tworzenie kopii roli, zmiana nazwy, opisu i uprawnień własnej roli, przypisywanie i odbieranie ról w firmie albo w wybranej jednostce oraz archiwizacja własnej roli.
 - **Aplikacje** (`/apps`) — aktywne i historyczne uprawnienia firmy do produktów (np. TimoTime) oraz nadawanie i odbieranie dostępu pracownikom z aktywnym kontem.
 - **Dziennik** (`/audit`) — dziennik zdarzeń firmy od najnowszych z filtrowaniem (osoba, zdarzenie, typ zasobu, zakres dat), rozwijanymi szczegółami (`metadata` oczyszczone przez Core) i stronicowaniem kursorem.
+- **Powiadomienia** (`/notifications`): ustawienia powiadomień e-mail zalogowanej osoby pogrupowane według produktów oraz grupy „Konto i bezpieczeństwo”, z włączaniem i wyłączaniem opcjonalnych kategorii oraz zablokowanymi wiadomościami o logowaniu i bezpieczeństwie.
 
 ## Co jest potrzebne do zmiany
 
@@ -25,12 +26,13 @@ Portal ukrywa formularze tam, gdzie z góry wiadomo, że nie da się wykonać ak
 | Przypisania ról (nadanie i odebranie)                                 | `core.roles.assign` w docelowym zakresie oraz posiadanie nadawanych uprawnień (albo właściciel) |
 | Dostęp do aplikacji (nadanie i odebranie)                             | `core.app_access.manage` obejmujące jednostki pracownika (albo w całej firmie) lub właściciel   |
 | Dziennik zdarzeń (odczyt)                                             | `core.audit.read` w całej firmie albo właściciel                                                |
+| Ustawienia powiadomień e-mail (własne konto)                          | Zalogowane konto w bieżącej firmie (bez dodatkowych uprawnień administratora)                   |
 
 ## Skróty klawiszowe
 
 - `⌘K` / `Ctrl+K` — paleta poleceń
 - `Shift+?` — podgląd skrótów klawiszowych
-- `g f` — Firma, `g p` — Pracownicy, `g s` — Struktura, `g r` — Role, `g a` — Aplikacje, `g d` — Dziennik (gdy osoba ma dostęp), `g w` — Wygląd
+- `g f` — Firma, `g p` — Pracownicy, `g s` — Struktura, `g r` — Role, `g a` — Aplikacje, `g d` — Dziennik (gdy osoba ma dostęp), `g n` — Powiadomienia, `g w` — Wygląd
 
 ## Jak działa sesja
 
