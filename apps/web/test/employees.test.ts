@@ -11,6 +11,7 @@ const employee = (overrides: Partial<Employee>): Employee => ({
   workEmail: null,
   jobTitle: null,
   status: "ACTIVE",
+  workSchedule: null,
   ...overrides,
 });
 
