@@ -4,8 +4,8 @@ Panel klienta Monorise (`portal.monorise.studio`): Owner i administratorzy firmy
 
 ## Ekrany pierwszej wersji
 
-- **Firma** (`/`) — nazwa i stan firmy, zmiana nazwy firmy, lista domen e-mail ze statusem weryfikacji, dodawanie domen, instrukcja rekordu DNS TXT ze sprawdzaniem DNS (lokalnie także „Potwierdź bez DNS”), zmiana głównej domeny, usuwanie niegłównych domen oraz przekazanie roli właściciela innej osobie z aktywnym kontem.
-- **Pracownicy** (`/employees`) — lista pracowników z ich statusem i informacją o koncie, edycja danych pracownika (imię, nazwisko, stanowisko oraz służbowy e-mail dla osób bez konta), wyłączanie i ponowne włączanie kont logowania, oczekujące zaproszenia ze stanem wysyłki e-maila (w kolejce, ponawiana wysyłka, wysłane z godziną albo błąd wysyłki z podpowiedzią), ich ponowne wysłanie i cofnięcie oraz zapraszanie nowych osób lub pracowników bez konta.
+- **Firma** (`/`) — nazwa i stan firmy, zmiana nazwy firmy, strefa czasowa i domyślny wymiar pracy firmy, lista domen e-mail ze statusem weryfikacji, dodawanie domen, instrukcja rekordu DNS TXT ze sprawdzaniem DNS (lokalnie także „Potwierdź bez DNS”), zmiana głównej domeny, usuwanie niegłównych domen oraz przekazanie roli właściciela innej osobie z aktywnym kontem.
+- **Pracownicy** (`/employees`) — lista pracowników z ich statusem, informacją o koncie i skrótem wymiaru pracy, edycja danych pracownika (imię, nazwisko, stanowisko, wymiar pracy z gotowymi ustawieniami i przeliczeniem etatu oraz służbowy e-mail dla osób bez konta), wyłączanie i ponowne włączanie kont logowania, oczekujące zaproszenia ze stanem wysyłki e-maila (w kolejce, ponawiana wysyłka, wysłane z godziną albo błąd wysyłki z podpowiedzią), ich ponowne wysłanie i cofnięcie oraz zapraszanie nowych osób lub pracowników bez konta.
 - **Struktura** (`/structure` i `/structure/[unitId]`) — drzewo oddziałów, działów i zespołów, dodawanie jednostek, zmiana nazwy, przypisywanie członków i kierowników oraz archiwizacja jednostki.
 - **Role** (`/roles` i `/roles/[roleId]`) — gotowe role Core i produktów oraz własne role firmy, tworzenie kopii roli, zmiana nazwy, opisu i uprawnień własnej roli, przypisywanie i odbieranie ról w firmie albo w wybranej jednostce oraz archiwizacja własnej roli.
 - **Aplikacje** (`/apps`) — aktywne i historyczne uprawnienia firmy do produktów (np. TimoTime) oraz nadawanie i odbieranie dostępu pracownikom z aktywnym kontem.
@@ -16,17 +16,17 @@ Panel klienta Monorise (`portal.monorise.studio`): Owner i administratorzy firmy
 
 Portal ukrywa formularze tam, gdzie z góry wiadomo, że nie da się wykonać akcji, ale każdą zmianę ostatecznie sprawdza Core. Gdy brakuje uprawnienia do odczytu wybranej listy lub fragmentu strony, Portal wyświetla komunikat „Nie masz uprawnienia, żeby to zobaczyć.”.
 
-| Działanie                                                             | Wymagane uprawnienie w Core                                                                     |
-| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Dane firmy (zmiana nazwy) i domeny e-mail                             | `core.organization.manage` w całej firmie albo właściciel                                       |
-| Przekazanie roli właściciela                                          | Tylko właściciel firmy                                                                          |
-| Pracownicy (edycja danych, wyłączanie i włączanie kont) i zaproszenia | `core.employees.manage` w całej firmie albo właściciel                                          |
-| Struktura firmy (jednostki i członkostwa)                             | `core.structure.manage` (dla jednostki, jednostki nadrzędnej albo całej firmy) albo właściciel  |
-| Role (tworzenie, edycja uprawnień, archiwizacja)                      | `core.roles.manage` w całej firmie albo właściciel                                              |
-| Przypisania ról (nadanie i odebranie)                                 | `core.roles.assign` w docelowym zakresie oraz posiadanie nadawanych uprawnień (albo właściciel) |
-| Dostęp do aplikacji (nadanie i odebranie)                             | `core.app_access.manage` obejmujące jednostki pracownika (albo w całej firmie) lub właściciel   |
-| Dziennik zdarzeń (odczyt)                                             | `core.audit.read` w całej firmie albo właściciel                                                |
-| Ustawienia powiadomień e-mail (własne konto)                          | Zalogowane konto w bieżącej firmie (bez dodatkowych uprawnień administratora)                   |
+| Działanie                                                                             | Wymagane uprawnienie w Core                                                                     |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Dane firmy (zmiana nazwy, strefa czasowa, domyślny wymiar pracy) i domeny e-mail      | `core.organization.manage` w całej firmie albo właściciel                                       |
+| Przekazanie roli właściciela                                                          | Tylko właściciel firmy                                                                          |
+| Pracownicy (edycja danych i wymiaru pracy, wyłączanie i włączanie kont) i zaproszenia | `core.employees.manage` w całej firmie albo właściciel                                          |
+| Struktura firmy (jednostki i członkostwa)                                             | `core.structure.manage` (dla jednostki, jednostki nadrzędnej albo całej firmy) albo właściciel  |
+| Role (tworzenie, edycja uprawnień, archiwizacja)                                      | `core.roles.manage` w całej firmie albo właściciel                                              |
+| Przypisania ról (nadanie i odebranie)                                                 | `core.roles.assign` w docelowym zakresie oraz posiadanie nadawanych uprawnień (albo właściciel) |
+| Dostęp do aplikacji (nadanie i odebranie)                                             | `core.app_access.manage` obejmujące jednostki pracownika (albo w całej firmie) lub właściciel   |
+| Dziennik zdarzeń (odczyt)                                                             | `core.audit.read` w całej firmie albo właściciel                                                |
+| Ustawienia powiadomień e-mail (własne konto)                                          | Zalogowane konto w bieżącej firmie (bez dodatkowych uprawnień administratora)                   |
 
 ## Skróty klawiszowe
 
