@@ -14,12 +14,24 @@ async function errorDetail(): Promise<string | undefined> {
   }
 }
 
+export interface NoticeData {
+  tone: "danger" | "success";
+  message: string;
+}
+
+/** Odczytuje treść komunikatu z parametrów adresu i ciasteczka `portal-error-detail`. */
+export async function readNotice(ok?: string | undefined, error?: string | undefined): Promise<NoticeData | null> {
+  const detail = error ? await errorDetail() : undefined;
+  const message = detail ?? messageFor(ERROR_MESSAGES, error) ?? messageFor(OK_MESSAGES, ok);
+  if (!message) return null;
+  return { tone: error ? "danger" : "success", message };
+}
+
 /** Komunikat po akcji formularza z `?ok=` albo `?error=` (pasek stanu z biblioteki, działa bez JavaScriptu). */
 export async function Notice({ ok, error }: { ok?: string | undefined; error?: string | undefined }) {
-  const detail = error ? await errorDetail() : undefined;
-  const text = detail ?? messageFor(ERROR_MESSAGES, error) ?? messageFor(OK_MESSAGES, ok);
-  if (!text) return null;
-  return <Banner tone={error ? "danger" : "success"} message={text} />;
+  const notice = await readNotice(ok, error);
+  if (!notice) return null;
+  return <Banner tone={notice.tone} message={notice.message} />;
 }
 
 /** Fragment strony, którego Core nie pozwolił wczytać (brak uprawnienia, awaria). */

@@ -18,7 +18,18 @@ import {
   useSidebar,
   type CommandPaletteGroup,
 } from "@monorise-team/ui";
-import { AppWindow, Building2, LogOut, Network, Palette, ScrollText, ShieldCheck, UserPlus, Users } from "lucide-react";
+import {
+  AppWindow,
+  Bell,
+  Building2,
+  LogOut,
+  Network,
+  Palette,
+  ScrollText,
+  ShieldCheck,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
@@ -44,7 +55,16 @@ const AUDIT_SECTION: Section = {
   shortcut: "g d",
 };
 
+const NOTIFICATIONS: Section = {
+  href: "/notifications",
+  label: "Powiadomienia",
+  icon: <Bell size={16} />,
+  shortcut: "g n",
+};
+
 const SETTINGS: Section = { href: "/settings", label: "Wygląd", icon: <Palette size={16} />, shortcut: "g w" };
+
+const PERSONAL_SECTIONS: readonly Section[] = [NOTIFICATIONS, SETTINGS];
 
 interface PanelShellProps {
   organizationName: string;
@@ -95,7 +115,10 @@ function ShellContent({ organizationName, personName, isOwner, canReadAudit, chi
   };
 
   useHotkeys(
-    [...visibleSections, SETTINGS].map((section) => ({ shortcut: section.shortcut, handler: () => go(section.href) })),
+    [...visibleSections, ...PERSONAL_SECTIONS].map((section) => ({
+      shortcut: section.shortcut,
+      handler: () => go(section.href),
+    })),
   );
 
   const groups = useMemo<CommandPaletteGroup[]>(
@@ -103,7 +126,7 @@ function ShellContent({ organizationName, personName, isOwner, canReadAudit, chi
       {
         id: "go",
         label: "Przejdź do",
-        items: [...visibleSections, SETTINGS].map((section) => ({
+        items: [...visibleSections, ...PERSONAL_SECTIONS].map((section) => ({
           id: section.href,
           label: section.label,
           icon: section.icon,
@@ -171,13 +194,16 @@ function ShellContent({ organizationName, personName, isOwner, canReadAudit, chi
         aria-label="Sekcje panelu"
         footer={
           <div className="flex flex-col gap-1">
-            <SidebarLink
-              href={SETTINGS.href}
-              icon={SETTINGS.icon}
-              label={SETTINGS.label}
-              active={isActive(SETTINGS.href)}
-              onClick={navigate(SETTINGS.href)}
-            />
+            {PERSONAL_SECTIONS.map((section) => (
+              <SidebarLink
+                key={section.href}
+                href={section.href}
+                icon={section.icon}
+                label={section.label}
+                active={isActive(section.href)}
+                onClick={navigate(section.href)}
+              />
+            ))}
             <form ref={signOutForm} method="post" action="/api/auth/sign-out">
               <SidebarItem type="submit" icon={<LogOut size={16} />} label="Wyloguj" />
             </form>
@@ -225,7 +251,7 @@ function ShellContent({ organizationName, personName, isOwner, canReadAudit, chi
           },
           {
             category: "Przejdź do",
-            items: [...visibleSections, SETTINGS].map((section) => ({
+            items: [...visibleSections, ...PERSONAL_SECTIONS].map((section) => ({
               label: section.label,
               shortcut: section.shortcut,
             })),

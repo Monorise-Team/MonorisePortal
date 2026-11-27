@@ -24,6 +24,8 @@ export const OK_MESSAGES: Record<string, string> = {
   "role-archived": "Rola zarchiwizowana.",
   "role-assigned": "Rola przypisana.",
   "role-unassigned": "Rola odebrana.",
+  "notification-enabled": "Powiadomienia zostały włączone.",
+  "notification-disabled": "Powiadomienia zostały wyłączone.",
 };
 
 /** Komunikaty błędów (`?error=<kod Core albo Portalu>`). */

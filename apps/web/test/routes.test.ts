@@ -52,6 +52,7 @@ const fakeCore = {
   deleteRoleAssignment: vi.fn(),
   grantAppAccess: vi.fn(),
   revokeAppAccess: vi.fn(),
+  updateMyNotificationPreference: vi.fn(),
 };
 
 vi.mock("@/server/auth", () => ({
@@ -87,6 +88,10 @@ import { POST as updateEmployeePost } from "@/app/api/employees/[employeeId]/rou
 import { POST as resendInvitationPost } from "@/app/api/invitations/[invitationId]/resend/route";
 import { POST as revokeInvitationPost } from "@/app/api/invitations/[invitationId]/revoke/route";
 import { POST as createInvitationPost } from "@/app/api/invitations/route";
+import {
+  POST as updateNotificationPreferencePost,
+  PUT as updateNotificationPreferencePut,
+} from "@/app/api/notifications/[category]/route";
 import { POST as deleteDomainPost } from "@/app/api/organization/domains/[domainId]/delete/route";
 import { POST as setPrimaryDomainPost } from "@/app/api/organization/domains/[domainId]/primary/route";
 import { POST as verifyDomainPost } from "@/app/api/organization/domains/[domainId]/verify/route";
@@ -1029,6 +1034,150 @@ describe("trasy formularzy Portalu", () => {
         params: Promise.resolve({ appAccessId: UUID_1 }),
       });
       expectRedirect(err, "/apps", { error: "NOT_FOUND" }, "Nie znaleziono dostępu");
+    });
+  });
+
+  describe("POST i PUT /api/notifications/[category]", () => {
+    const putJson = (path: string, body: unknown) =>
+      new Request(`http://portal.localhost:3400${path}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    it("POST przełącza opcjonalną kategorię formularzem HTML i wraca z komunikatem sukcesu", async () => {
+      const off = await updateNotificationPreferencePost(
+        post("/api/notifications/timotime.reminders", formOf({ enabled: "false" })),
+        { params: Promise.resolve({ category: "timotime.reminders" }) },
+      );
+      expect(fakeCore.updateMyNotificationPreference).toHaveBeenCalledWith({
+        path: { category: "timotime.reminders" },
+        body: { enabled: false },
+      });
+      expectRedirect(off, "/notifications", { ok: "notification-disabled" });
+
+      const on = await updateNotificationPreferencePost(
+        post("/api/notifications/kivotasks.assignments", formOf({ enabled: "true" })),
+        { params: Promise.resolve({ category: "kivotasks.assignments" }) },
+      );
+      expect(fakeCore.updateMyNotificationPreference).toHaveBeenLastCalledWith({
+        path: { category: "kivotasks.assignments" },
+        body: { enabled: true },
+      });
+      expectRedirect(on, "/notifications", { ok: "notification-enabled" });
+    });
+
+    it("POST odrzuca błędną kategorię lub wartość enabled oraz przekazuje 422 z Core", async () => {
+      const badCategory = await updateNotificationPreferencePost(
+        post("/api/notifications/..%2Fx", formOf({ enabled: "false" })),
+        { params: Promise.resolve({ category: "../x" }) },
+      );
+      expectRedirect(badCategory, "/notifications", { error: "VALIDATION_FAILED" });
+
+      const badEnabled = await updateNotificationPreferencePost(
+        post("/api/notifications/timotime.reminders", formOf({ enabled: "maybe" })),
+        { params: Promise.resolve({ category: "timotime.reminders" }) },
+      );
+      expectRedirect(badEnabled, "/notifications", { error: "VALIDATION_FAILED" });
+      expect(fakeCore.updateMyNotificationPreference).not.toHaveBeenCalled();
+
+      const lockedMsg = "Nie można wyłączyć obowiązkowej kategorii powiadomień.";
+      fakeCore.updateMyNotificationPreference.mockRejectedValueOnce(coreError("VALIDATION_FAILED", lockedMsg, 422));
+      const locked = await updateNotificationPreferencePost(
+        post("/api/notifications/security", formOf({ enabled: "false" })),
+        { params: Promise.resolve({ category: "security" }) },
+      );
+      expectRedirect(locked, "/notifications", { error: "VALIDATION_FAILED" }, lockedMsg);
+    });
+
+    it("PUT aktualizuje opcjonalną kategorię i zwraca kopertę JSON 200", async () => {
+      const updated = {
+        category: "kivotasks.assignments",
+        channel: "notifications",
+        description: "Powiadomienia o przypisanych zadaniach.",
+        enabled: false,
+        name: "Przypisania do zadań",
+        optional: true,
+        product: "kivotasks",
+      };
+      fakeCore.updateMyNotificationPreference.mockResolvedValueOnce(updated);
+
+      const res = await updateNotificationPreferencePut(
+        putJson("/api/notifications/kivotasks.assignments", { enabled: false }),
+        { params: Promise.resolve({ category: "kivotasks.assignments" }) },
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get("Cache-Control")).toBe("no-store");
+      expect(fakeCore.updateMyNotificationPreference).toHaveBeenCalledWith({
+        path: { category: "kivotasks.assignments" },
+        body: { enabled: false },
+      });
+      await expect(res.json()).resolves.toEqual({
+        data: updated,
+        meta: { requestId: expect.any(String) },
+        error: null,
+      });
+    });
+
+    it("PUT zwraca 422 dla kategorii obowiązkowej z Core, błędnej ścieżki lub błędnego ciała", async () => {
+      const lockedMsg = "Tej kategorii powiadomień nie można wyłączyć.";
+      fakeCore.updateMyNotificationPreference.mockRejectedValueOnce(coreError("VALIDATION_FAILED", lockedMsg, 422));
+      const locked = await updateNotificationPreferencePut(putJson("/api/notifications/security", { enabled: false }), {
+        params: Promise.resolve({ category: "security" }),
+      });
+      expect(locked.status).toBe(422);
+      await expect(locked.json()).resolves.toEqual({
+        data: null,
+        meta: { requestId: expect.any(String) },
+        error: { code: "VALIDATION_FAILED", message: lockedMsg, details: [] },
+      });
+
+      const badCategory = await updateNotificationPreferencePut(
+        putJson("/api/notifications/..%2Fx", { enabled: false }),
+        { params: Promise.resolve({ category: "../x" }) },
+      );
+      expect(badCategory.status).toBe(422);
+
+      const badBody = await updateNotificationPreferencePut(
+        putJson("/api/notifications/timotime.reminders", { enabled: "false" }),
+        { params: Promise.resolve({ category: "timotime.reminders" }) },
+      );
+      expect(badBody.status).toBe(422);
+      expect(fakeCore.updateMyNotificationPreference).toHaveBeenCalledTimes(1);
+    });
+
+    it("PUT obsługuje brak sesji (401), token bearer (401) oraz niedostępność Core (503)", async () => {
+      authState.unauthenticated = true;
+      const unauth = await updateNotificationPreferencePut(
+        putJson("/api/notifications/timotime.reminders", { enabled: false }),
+        { params: Promise.resolve({ category: "timotime.reminders" }) },
+      );
+      expect(unauth.status).toBe(401);
+
+      authState.unauthenticated = false;
+      authState.viaBearer = true;
+      const bearer = await updateNotificationPreferencePut(
+        putJson("/api/notifications/timotime.reminders", { enabled: false }),
+        { params: Promise.resolve({ category: "timotime.reminders" }) },
+      );
+      expect(bearer.status).toBe(401);
+
+      authState.viaBearer = false;
+      fakeCore.updateMyNotificationPreference.mockRejectedValueOnce(new CoreApiUnavailableError("Connection refused"));
+      const offline = await updateNotificationPreferencePut(
+        putJson("/api/notifications/timotime.reminders", { enabled: false }),
+        { params: Promise.resolve({ category: "timotime.reminders" }) },
+      );
+      expect(offline.status).toBe(503);
+      await expect(offline.json()).resolves.toEqual({
+        data: null,
+        meta: { requestId: expect.any(String) },
+        error: {
+          code: "UNAVAILABLE",
+          message: "Core jest chwilowo niedostępny. Spróbuj za chwilę.",
+          details: [],
+        },
+      });
     });
   });
 });
